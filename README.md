@@ -1,0 +1,2 @@
+# btcd
+Bitcoin in Go
