@@ -1,4 +1,4 @@
-package crypto
+package sha256
 
 import "math"
 

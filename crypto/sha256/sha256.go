@@ -5,7 +5,7 @@ https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
 noone in their right mind should use this for any serious reason;
 this was written purely for educational purposes
 */
-package crypto
+package sha256
 
 import (
 	"encoding/binary"
