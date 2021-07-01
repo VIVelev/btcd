@@ -128,12 +128,13 @@ func (curve *CurveParams) ScalarMult(x1, y1, k *big.Int) (x, y *big.Int) {
 	y = big.NewInt(0)
 	appendX, appendY := new(big.Int).Set(x1), new(big.Int).Set(y1)
 
-	for k.Sign() != 0 {
-		if k.Bit(0) == 1 {
+	i := 0
+	for i < k.BitLen() {
+		if k.Bit(i) == 1 {
 			x, y = curve.Add(x, y, appendX, appendY)
 		}
 		appendX, appendY = curve.Add(appendX, appendY, appendX, appendY)
-		k.Rsh(k, 1)
+		i += 1
 	}
 	return
 }
