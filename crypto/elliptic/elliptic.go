@@ -1,5 +1,5 @@
 // Package elliptic implements several standard elliptic curves over prime finite fields
-// of the form: y^2 = x^3 + a*x + b
+// of the form: y^2 = x^3 + a*x + b (mod p)
 package elliptic
 
 import (
@@ -57,11 +57,16 @@ func (curve *CurveParams) IsOnCurve(x, y *big.Int) bool {
 	return curve.polynomial(x).Cmp(y2) == 0
 }
 
+// isPointAtInf tests whether (x,y) is the point at infinity
 func isPointAtInf(x, y *big.Int) bool {
 	return x.Sign() == 0 && y.Sign() == 0
 }
 
 func (curve *CurveParams) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
+	// TODO: What happens when the points (x1,y1) & (x2,y2) are not on the curve?
+
+	x, y = new(big.Int), new(big.Int)
+
 	// handle the special case of additive identity
 	if isPointAtInf(x1, y1) {
 		x.Set(x2)
@@ -119,17 +124,15 @@ func (curve *CurveParams) Add(x1, y1, x2, y2 *big.Int) (x, y *big.Int) {
 
 func (curve *CurveParams) ScalarMult(x1, y1, k *big.Int) (x, y *big.Int) {
 	// Set (x,y) to the additive identity (the point at infinity)
-	x.SetInt64(0)
-	y.SetInt64(0)
+	x = big.NewInt(0)
+	y = big.NewInt(0)
 	appendX, appendY := new(big.Int).Set(x1), new(big.Int).Set(y1)
 
 	for k.Sign() != 0 {
 		if k.Bit(0) == 1 {
-			x.Add(x, appendX)
-			y.Add(y, appendY)
+			x, y = curve.Add(x, y, appendX, appendY)
 		}
-		appendX.Add(appendX, appendX)
-		appendY.Add(appendY, appendY)
+		appendX, appendY = curve.Add(appendX, appendY, appendX, appendY)
 		k.Rsh(k, 1)
 	}
 	return
