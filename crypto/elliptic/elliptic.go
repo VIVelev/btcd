@@ -17,6 +17,13 @@ type Curve interface {
 	ScalarMult(x1, y1, k *big.Int) (x, y *big.Int)
 	// ScalarBaseMult returns k*G, where G is the base point of the group
 	ScalarBaseMult(k *big.Int) (x, y *big.Int)
+	// Marshal serializes a point (x,y) in a uncompressed format.
+	Marshal(x, y *big.Int) []byte
+	// MarshalCompressed serializes a point (x,y) in a compressed
+	// SEC format.
+	MarshalCompressed(x, y *big.Int) []byte
+	// Unmarshal deserializes a point (x,y)
+	Unmarshal(buf []byte) (x, y *big.Int)
 }
 
 // CurveParams contains the parameters of an elliptic curve and also provides
@@ -142,4 +149,55 @@ func (curve *CurveParams) ScalarMult(x1, y1, k *big.Int) (x, y *big.Int) {
 func (curve *CurveParams) ScalarBaseMult(k *big.Int) (x, y *big.Int) {
 	x, y = curve.ScalarMult(curve.Gx, curve.Gy, k)
 	return
+}
+
+func (curve *CurveParams) Marshal(x, y *big.Int) []byte {
+	byteSize := (curve.BitSize + 7) / 8
+	ret := make([]byte, 2*byteSize+1)
+	ret[0] = 4
+	copy(ret[1:byteSize+1], x.Bytes())
+	copy(ret[byteSize+1:], y.Bytes())
+	return ret
+}
+
+func (curve *CurveParams) MarshalCompressed(x, y *big.Int) []byte {
+	byteSize := (curve.BitSize + 7) / 8
+	ret := make([]byte, byteSize+1)
+	if y.Bit(0) == 0 {
+		ret[0] = 2
+	} else {
+		ret[0] = 3
+	}
+	copy(ret[1:], x.Bytes())
+	return ret
+}
+
+func (curve *CurveParams) Unmarshal(buf []byte) (x, y *big.Int) {
+	byteSize := (curve.BitSize + 7) / 8
+
+	// Uncompressed unmarshal.
+	if buf[0] == 4 {
+		x = new(big.Int).SetBytes(buf[1 : byteSize+1])
+		y = new(big.Int).SetBytes(buf[byteSize+1:])
+		return
+	}
+
+	if buf[0] != 2 && buf[0] != 3 {
+		panic("Unmarshal: invalid prefix byte")
+	}
+
+	// Compressed unmarshal.
+	isEven := buf[0] == 2
+	x = new(big.Int).SetBytes(buf[1 : byteSize+1])
+	// y^2 = x^3 + a*x + b (mod p)
+	y = curve.polynomial(x)
+	y.ModSqrt(y, curve.P)
+	y.Mod(y, curve.P)
+
+	if (y.Bit(0) == 0) == isEven {
+		return
+	} else {
+		y.Sub(curve.P, y)
+		return
+	}
 }
