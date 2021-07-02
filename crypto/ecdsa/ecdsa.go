@@ -3,6 +3,7 @@
 package ecdsa
 
 import (
+	"bytes"
 	"math/big"
 	"math/rand"
 
@@ -30,7 +31,7 @@ func (priv *PrivateKey) Sign(msgDigest []byte) *Signature {
 	// Generate a cryptographically secure random number k between 1 and n-1.
 	// It should be deterministic.
 	rand.Seed(new(big.Int).SetBytes(msgDigest).Int64())
-	kBytes := make([]byte, priv.Curve.Params().BitSize/8)
+	kBytes := make([]byte, (priv.Curve.Params().BitSize+7)/8)
 RESTART:
 	rand.Read(kBytes)
 	k := new(big.Int).SetBytes(kBytes)
@@ -101,6 +102,114 @@ func (sig *Signature) Verify(pub *PublicKey, msgDigest []byte) bool {
 
 	// If r = x mod n then the signature is valid. Otherwise, the signature is invalid.
 	return x.Mod(x, n).Cmp(sig.r) == 0
+}
+
+// Marshal encodes sig in DER format.
+//
+// DER has the following format:
+// 0x30 [total-length] 0x02 [r-length] [r] 0x02 [s-length] [s]
+//
+// total-length: 1-byte length descriptor of everything that follows.
+// r-length: 1-byte length descriptor of the r value that follows.
+// r: arbitrary-length big-endian encoded r value. It cannot start with any 0x00 bytes,
+// unless the first byte that follows is 0x80 or higher, in which case a single 0x00 is required.
+// s-length: 1-byte length descriptor of the s value that follows.
+// s: arbitrary-length big-endian encoded s value. The same rules apply as for r.
+func (sig *Signature) Marshal() []byte {
+	encode := func(n *big.Int) []byte {
+		nb := n.Bytes()
+		nb = bytes.TrimLeft(nb, "\x00")
+		if nb[0] >= 0x80 {
+			nb = append([]byte{0}, nb...)
+		}
+		return nb
+	}
+
+	rb := encode(sig.r)
+	rbLen := byte(len(rb))
+	sb := encode(sig.s)
+	sbLen := byte(len(sb))
+	u := []byte{0x30, 2 + rbLen + 2 + sbLen, 0x02, rbLen}
+	v := []byte{0x02, sbLen}
+	return bytes.Join([][]byte{u, rb, v, sb}, nil)
+}
+
+// Unmarshal decodes DER format to sig.
+func (sig *Signature) Unmarshal(der []byte) *Signature {
+	s := bytes.NewReader(der)
+
+	// read and validate 0x30 prefix
+	b, err := s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	if b != 0x30 {
+		panic("der signatures should begin with 0x30 byte")
+	}
+
+	// read and validate total-length
+	totalLength, err := s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	if totalLength != byte(len(der)-2) {
+		panic("total-length does not match")
+	}
+
+	// read and validate marker
+	b, err = s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	if b != 0x02 {
+		panic("invalid marker")
+	}
+
+	// read r
+	rbLen, err := s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	rb := make([]byte, rbLen)
+	n, err := s.Read(rb)
+	if err != nil {
+		panic(err)
+	}
+	if n != int(rbLen) {
+		panic("couldn't read the whole r")
+	}
+
+	// read and validate marker
+	b, err = s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	if b != 0x02 {
+		panic("invalid marker")
+	}
+
+	// read s
+	sbLen, err := s.ReadByte()
+	if err != nil {
+		panic(err)
+	}
+	sb := make([]byte, sbLen)
+	n, err = s.Read(sb)
+	if err != nil {
+		panic(err)
+	}
+	if n != int(sbLen) {
+		panic("couldn't read the whole s")
+	}
+
+	// validate lengths
+	if 6+rbLen+sbLen != byte(len(der)) { // 6 is the number of misc bytes
+		panic("read length doesn't match der length")
+	}
+
+	sig.r = new(big.Int).SetBytes(rb)
+	sig.s = new(big.Int).SetBytes(sb)
+	return sig
 }
 
 // GenerateKey generates a public and private key pair from the passphrase.

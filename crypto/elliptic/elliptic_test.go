@@ -33,14 +33,14 @@ func TestMain(m *testing.M) {
 
 func TestOnCurve(t *testing.T) {
 	if !Secp256k1.IsOnCurve(Secp256k1.Gx, Secp256k1.Gy) {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 }
 
 func TestOffCurve(t *testing.T) {
 	x, y := big.NewInt(1), big.NewInt(1)
 	if Secp256k1.IsOnCurve(x, y) {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 }
 
@@ -48,7 +48,7 @@ func TestAdd(t *testing.T) {
 	x, y := curve.Add(x1, y1, x2, y2)
 
 	if x.Int64() != 244 || y.Int64() != 203 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 }
 
@@ -57,7 +57,7 @@ func TestScalarMult(t *testing.T) {
 	x, y := curve.ScalarMult(x1, y1, k)
 
 	if x.Int64() != 94 || y.Int64() != 161 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 
 }
@@ -65,23 +65,23 @@ func TestScalarMult(t *testing.T) {
 func TestMarshal(t *testing.T) {
 	buf := Secp256k1.Marshal(Secp256k1.Gx, Secp256k1.Gy)
 	if len(buf) != 65 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 
 	x, y := Secp256k1.Unmarshal(buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 }
 
 func TestMarshalCompressed(t *testing.T) {
 	buf := Secp256k1.MarshalCompressed(Secp256k1.Gx, Secp256k1.Gy)
 	if len(buf) != 33 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 
 	x, y := Secp256k1.Unmarshal(buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
-		t.Errorf("FATAL")
+		t.Errorf("FAIL")
 	}
 }

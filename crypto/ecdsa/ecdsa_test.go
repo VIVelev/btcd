@@ -35,3 +35,16 @@ func TestSignVerifyFail(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestSignatureMarshalling(t *testing.T) {
+	priv := GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
+	msgDigest := sha256.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
+	sig := priv.Sign(msgDigest[:])
+
+	der := sig.Marshal()
+	sig2 := new(Signature).Unmarshal(der)
+	if sig2.r.Cmp(sig.r) != 0 || sig2.s.Cmp(sig.s) != 0 {
+		t.Errorf("FAIL")
+	}
+
+}
