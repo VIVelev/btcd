@@ -1,11 +1,10 @@
-/*
-follows the FIPS PUB 180-4 description for calculating SHA-256 hash function
-https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+package hash
 
-noone in their right mind should use this for any serious reason;
-this was written purely for educational purposes
-*/
-package sha256
+// Follows the FIPS PUB 180-4 description for calculating SHA-256 hash function:
+// https://nvlpubs.nist.gov/nistpubs/FIPS/NIST.FIPS.180-4.pdf
+//
+// Noone in their right mind should use this for any serious reason.
+// This was written purely for educational purposes.
 
 import (
 	"encoding/binary"
@@ -27,14 +26,14 @@ func (w word) String() string {
 // -----------------------------------------------------------------------------
 // SHA-256 Functions, defined in Sections 3.2 and 4.1.2
 
-// rotate right (circular right shift)
+// Rotate right (circular right shift).
 func rotr(n int, x word) (res word) {
 	xInt := x.Uint32()
 	binary.BigEndian.PutUint32(res[:], (xInt>>n)|(xInt<<(32-n)))
 	return
 }
 
-// right shift
+// Right shift.
 func shr(n int, x word) (res word) {
 	xInt := x.Uint32()
 	binary.BigEndian.PutUint32(res[:], xInt>>n)
@@ -80,21 +79,19 @@ func sig1(x word) (res word) {
 // -----------------------------------------------------------------------------
 // SHA-256 Constants
 
-/*
-follows Section 4.2.2 to generate K
-
-the first 32 bits of the fractional parts of the cube roots of the first
-64 prime numbers:
-
-428a2f98 71374491 b5c0fbcf e9b5dba5 3956c25b 59f111f1 923f82a4 ab1c5ed5
-d807aa98 12835b01 243185be 550c7dc3 72be5d74 80deb1fe 9bdc06a7 c19bf174
-e49b69c1 efbe4786 0fc19dc6 240ca1cc 2de92c6f 4a7484aa 5cb0a9dc 76f988da
-983e5152 a831c66d b00327c8 bf597fc7 c6e00bf3 d5a79147 06ca6351 14292967
-27b70a85 2e1b2138 4d2c6dfc 53380d13 650a7354 766a0abb 81c2c92e 92722c85
-a2bfe8a1 a81a664b c24b8b70 c76c51a3 d192e819 d6990624 f40e3585 106aa070
-19a4c116 1e376c08 2748774c 34b0bcb5 391c0cb3 4ed8aa4a 5b9cca4f 682e6ff3
-748f82ee 78a5636f 84c87814 8cc70208 90befffa a4506ceb bef9a3f7 c67178f2
-*/
+// Follows Section 4.2.2 to generate K.
+//
+// The first 32 bits of the fractional parts of the cube roots of the first
+// 64 prime numbers:
+//
+// 428a2f98 71374491 b5c0fbcf e9b5dba5 3956c25b 59f111f1 923f82a4 ab1c5ed5
+// d807aa98 12835b01 243185be 550c7dc3 72be5d74 80deb1fe 9bdc06a7 c19bf174
+// e49b69c1 efbe4786 0fc19dc6 240ca1cc 2de92c6f 4a7484aa 5cb0a9dc 76f988da
+// 983e5152 a831c66d b00327c8 bf597fc7 c6e00bf3 d5a79147 06ca6351 14292967
+// 27b70a85 2e1b2138 4d2c6dfc 53380d13 650a7354 766a0abb 81c2c92e 92722c85
+// a2bfe8a1 a81a664b c24b8b70 c76c51a3 d192e819 d6990624 f40e3585 106aa070
+// 19a4c116 1e376c08 2748774c 34b0bcb5 391c0cb3 4ed8aa4a 5b9cca4f 682e6ff3
+// 748f82ee 78a5636f 84c87814 8cc70208 90befffa a4506ceb bef9a3f7 c67178f2
 func genK() (K [64]word) {
 	for i, p := range firstNPrimes(64) {
 		binary.BigEndian.PutUint32(K[i][:], uint32(fracBin(math.Pow(float64(p), 1/3.), 32)))
@@ -102,14 +99,12 @@ func genK() (K [64]word) {
 	return
 }
 
-/*
-follows Section 5.3.3 to generate the initial hash value H^0
-
-the first 32 bits of the fractional parts of the square roots of the first
-8 prime numbers:
-
-6a09e667 bb67ae85 3c6ef372 a54ff53a 9b05688c 510e527f 1f83d9ab 5be0cd19
-*/
+// Follows Section 5.3.3 to generate the initial hash value H^0.
+//
+// The first 32 bits of the fractional parts of the square roots of the first
+// 8 prime numbers:
+//
+// 6a09e667 bb67ae85 3c6ef372 a54ff53a 9b05688c 510e527f 1f83d9ab 5be0cd19
 func genH() (H [8]word) {
 	for i, p := range firstNPrimes(8) {
 		binary.BigEndian.PutUint32(H[i][:], uint32(fracBin(math.Sqrt(float64(p)), 32)))
@@ -119,8 +114,8 @@ func genH() (H [8]word) {
 
 // -----------------------------------------------------------------------------
 
-// follows Section 5.1.1 to pad the message
-// the result's length is multiple of 512 bits (64 bytes)
+// Follows Section 5.1.1 to pad the message.
+// The result's length is multiple of 512 bits (64 bytes).
 func pad(data []byte) []byte {
 	// len of data in bits
 	l := uint64(len(data) * 8)
@@ -128,7 +123,7 @@ func pad(data []byte) []byte {
 	// append just "1" to the end of data
 	data = append(data, 0b10000000)
 
-	// follow by k zero bits, where k is the smallest, non-negative solution to
+	// follow by k zero bits, where k is the smallest, non-negative solution to:
 	// l + 1 + k = 448 mod 512
 	// i.e. pad with zeros until we reach 448 (mod 512)
 	for (len(data)*8)%512 != 448 {
@@ -163,7 +158,7 @@ func Sha256(data []byte) [32]byte {
 	// Section 6
 	for _, M := range blocks {
 
-		// 1. Prepare the message schedule, a 64-entry array of 32-bit words
+		// 1. Prepare the message schedule, a 64-entry array of 32-bit words.
 		W := [64]word{}
 		for t := range W {
 			if t <= 15 {
@@ -179,7 +174,7 @@ func Sha256(data []byte) [32]byte {
 			}
 		}
 
-		// 2. Initialize the 8 working variables a,b,c,d,e,f,g,h with prev hash value
+		// 2. Initialize the 8 working variables a,b,c,d,e,f,g,h with prev hash value.
 		a, b, c, d, e, f, g, h := H[0], H[1], H[2], H[3], H[4], H[5], H[6], H[7]
 
 		// 3.
@@ -196,7 +191,7 @@ func Sha256(data []byte) [32]byte {
 			binary.BigEndian.PutUint32(a[:], T1+T2)
 		}
 
-		// 4. Compute the i-th intermediate hash value H^i
+		// 4. Compute the i-th intermediate hash value H^i.
 		delta := [8]word{a, b, c, d, e, f, g, h}
 		for i := range H {
 			binary.BigEndian.PutUint32(H[i][:], H[i].Uint32()+delta[i].Uint32())

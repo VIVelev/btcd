@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/VIVelev/btcd/crypto/elliptic"
-	"github.com/VIVelev/btcd/crypto/sha256"
+	"github.com/VIVelev/btcd/crypto/hash"
 )
 
 func TestGenerateKey(t *testing.T) {
@@ -18,7 +18,7 @@ func TestGenerateKey(t *testing.T) {
 
 func TestSignVerify(t *testing.T) {
 	priv := GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
-	msgDigest := sha256.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
+	msgDigest := hash.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
 	sig := priv.Sign(msgDigest[:])
 	if !sig.Verify(&priv.PublicKey, msgDigest[:]) {
 		t.Errorf("FAIL")
@@ -27,7 +27,7 @@ func TestSignVerify(t *testing.T) {
 
 func TestSignVerifyFail(t *testing.T) {
 	priv := GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
-	msgDigest := sha256.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
+	msgDigest := hash.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
 	sig := priv.Sign(msgDigest[:])
 
 	wrongPriv := GenerateKey(elliptic.Secp256k1, "notfrombetelgeuse")
@@ -38,7 +38,7 @@ func TestSignVerifyFail(t *testing.T) {
 
 func TestSignatureMarshalling(t *testing.T) {
 	priv := GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
-	msgDigest := sha256.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
+	msgDigest := hash.Hash256([]byte("Ford Prefect is also from Betelgeuse!"))
 	sig := priv.Sign(msgDigest[:])
 
 	der := sig.Marshal()

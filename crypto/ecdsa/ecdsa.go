@@ -8,13 +8,37 @@ import (
 	"math/rand"
 
 	"github.com/VIVelev/btcd/crypto/elliptic"
-	"github.com/VIVelev/btcd/crypto/sha256"
+	"github.com/VIVelev/btcd/crypto/hash"
 )
 
 // PublicKey represents an ECDSA public key.
 type PublicKey struct {
 	elliptic.Curve
 	X, Y *big.Int
+}
+
+func (pub *PublicKey) Marshal() []byte {
+	return pub.Curve.Marshal(pub.X, pub.Y)
+}
+
+func (pub *PublicKey) MarshalCompressed() []byte {
+	return pub.Curve.MarshalCompressed(pub.X, pub.Y)
+}
+
+func (pub *PublicKey) Unmarshal(buf []byte) *PublicKey {
+	pub.X, pub.Y = pub.Curve.Unmarshal(buf)
+	return pub
+}
+
+func (pub *PublicKey) Address(compressed, testnet bool) string {
+	/* var pkb []byte
+	if compressed {
+		pkb = pub.MarshalCompressed()
+	} else {
+		pkb = pub.Marshal()
+	} */
+
+	return "Hello"
 }
 
 // PrivateKey represents an ECDSA private key.
@@ -216,7 +240,7 @@ func (sig *Signature) Unmarshal(der []byte) *Signature {
 func GenerateKey(c elliptic.Curve, passphrase string) *PrivateKey {
 	priv := new(PrivateKey)
 	priv.Curve = c
-	buf := sha256.Hash256([]byte(passphrase))
+	buf := hash.Hash256([]byte(passphrase))
 	priv.D = new(big.Int).SetBytes(buf[:])
 	priv.D.Mod(priv.D, priv.Curve.Params().N)
 	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(priv.D)
