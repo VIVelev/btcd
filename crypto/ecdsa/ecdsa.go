@@ -18,15 +18,15 @@ type PublicKey struct {
 }
 
 func (pub *PublicKey) Marshal() []byte {
-	return pub.Curve.Marshal(pub.X, pub.Y)
+	return elliptic.Marshal(pub.Curve, pub.X, pub.Y)
 }
 
 func (pub *PublicKey) MarshalCompressed() []byte {
-	return pub.Curve.MarshalCompressed(pub.X, pub.Y)
+	return elliptic.MarshalCompressed(pub.Curve, pub.X, pub.Y)
 }
 
 func (pub *PublicKey) Unmarshal(buf []byte) *PublicKey {
-	pub.X, pub.Y = pub.Curve.Unmarshal(buf)
+	pub.X, pub.Y = elliptic.Unmarshal(pub.Curve, buf)
 	return pub
 }
 

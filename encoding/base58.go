@@ -1,13 +1,12 @@
 package encoding
 
+// base58 encoding / decoding functions
+
 import (
 	"bytes"
 	"math"
 	"math/big"
 )
-
-// base58 encoding / decoding functions
-// reference: https://en.bitcoin.it/wiki/Base58Check_encoding
 
 const (
 	alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

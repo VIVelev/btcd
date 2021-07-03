@@ -17,13 +17,6 @@ type Curve interface {
 	ScalarMult(x1, y1, k *big.Int) (x, y *big.Int)
 	// ScalarBaseMult returns k*G, where G is the base point of the group
 	ScalarBaseMult(k *big.Int) (x, y *big.Int)
-	// Marshal serializes a point (x,y) in a uncompressed format.
-	Marshal(x, y *big.Int) []byte
-	// MarshalCompressed serializes a point (x,y) in a compressed
-	// SEC format.
-	MarshalCompressed(x, y *big.Int) []byte
-	// Unmarshal deserializes a point (x,y)
-	Unmarshal(buf []byte) (x, y *big.Int)
 }
 
 // CurveParams contains the parameters of an elliptic curve and also provides
@@ -151,8 +144,9 @@ func (curve *CurveParams) ScalarBaseMult(k *big.Int) (x, y *big.Int) {
 	return
 }
 
-func (curve *CurveParams) Marshal(x, y *big.Int) []byte {
-	byteSize := (curve.BitSize + 7) / 8
+// Marshal serializes a point (x,y) in a uncompressed format.
+func Marshal(curve Curve, x, y *big.Int) []byte {
+	byteSize := (curve.Params().BitSize + 7) / 8
 	ret := make([]byte, 2*byteSize+1)
 	ret[0] = 4
 	copy(ret[1:byteSize+1], x.Bytes())
@@ -160,8 +154,10 @@ func (curve *CurveParams) Marshal(x, y *big.Int) []byte {
 	return ret
 }
 
-func (curve *CurveParams) MarshalCompressed(x, y *big.Int) []byte {
-	byteSize := (curve.BitSize + 7) / 8
+// MarshalCompressed serializes a point (x,y) in a compressed
+// SEC format.
+func MarshalCompressed(curve Curve, x, y *big.Int) []byte {
+	byteSize := (curve.Params().BitSize + 7) / 8
 	ret := make([]byte, byteSize+1)
 	if y.Bit(0) == 0 {
 		ret[0] = 2
@@ -172,8 +168,9 @@ func (curve *CurveParams) MarshalCompressed(x, y *big.Int) []byte {
 	return ret
 }
 
-func (curve *CurveParams) Unmarshal(buf []byte) (x, y *big.Int) {
-	byteSize := (curve.BitSize + 7) / 8
+// Unmarshal deserializes a point (x,y)
+func Unmarshal(curve Curve, buf []byte) (x, y *big.Int) {
+	byteSize := (curve.Params().BitSize + 7) / 8
 
 	// Uncompressed unmarshal.
 	if buf[0] == 4 {
@@ -187,17 +184,18 @@ func (curve *CurveParams) Unmarshal(buf []byte) (x, y *big.Int) {
 	}
 
 	// Compressed unmarshal.
+	p := curve.Params().P
 	isEven := buf[0] == 2
 	x = new(big.Int).SetBytes(buf[1 : byteSize+1])
 	// y^2 = x^3 + a*x + b (mod p)
-	y = curve.polynomial(x)
-	y.ModSqrt(y, curve.P)
-	y.Mod(y, curve.P)
+	y = curve.Params().polynomial(x)
+	y.ModSqrt(y, p)
+	y.Mod(y, p)
 
 	if (y.Bit(0) == 0) == isEven {
 		return
 	} else {
-		y.Sub(curve.P, y)
+		y.Sub(p, y)
 		return
 	}
 }

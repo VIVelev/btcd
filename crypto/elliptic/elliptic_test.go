@@ -63,24 +63,24 @@ func TestScalarMult(t *testing.T) {
 }
 
 func TestMarshal(t *testing.T) {
-	buf := Secp256k1.Marshal(Secp256k1.Gx, Secp256k1.Gy)
+	buf := Marshal(Secp256k1, Secp256k1.Gx, Secp256k1.Gy)
 	if len(buf) != 65 {
 		t.Errorf("FAIL")
 	}
 
-	x, y := Secp256k1.Unmarshal(buf)
+	x, y := Unmarshal(Secp256k1, buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
 		t.Errorf("FAIL")
 	}
 }
 
 func TestMarshalCompressed(t *testing.T) {
-	buf := Secp256k1.MarshalCompressed(Secp256k1.Gx, Secp256k1.Gy)
+	buf := MarshalCompressed(Secp256k1, Secp256k1.Gx, Secp256k1.Gy)
 	if len(buf) != 33 {
 		t.Errorf("FAIL")
 	}
 
-	x, y := Secp256k1.Unmarshal(buf)
+	x, y := Unmarshal(Secp256k1, buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
 		t.Errorf("FAIL")
 	}
