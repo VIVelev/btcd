@@ -53,3 +53,31 @@ func AddressToPubKeyHash(address string) ([]byte, error) {
 	// return the hash, stripping the version byte and checksum bytes
 	return netPkHashCheck[1:b], nil
 }
+
+// Wif encodes the private key in WIF format.
+//
+// WIF has the following format:
+// [1 byte net id] [D in big-endian] [suffix if compressed] [4 bytes checksum]
+//
+// reference: https://en.bitcoin.it/wiki/Wallet_import_format
+func Wif(priv *ecdsa.PrivateKey, compressed, testnet bool) string {
+	privSize := (priv.Curve.Params().BitSize + 7) / 8
+	size := 1 + privSize + 4
+	if compressed {
+		size += 1
+	}
+	wif := make([]byte, size)
+
+	if testnet {
+		wif[0] = 0xef
+	} else {
+		wif[0] = 0x80
+	}
+	priv.D.FillBytes(wif[1 : privSize+1])
+	if compressed {
+		wif[privSize+1] = 0x01
+	}
+	checksum := hash.Hash256(wif[:size-4])
+	copy(wif[size-4:], checksum[:4])
+	return base58encode(wif)
+}
