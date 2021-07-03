@@ -30,17 +30,6 @@ func (pub *PublicKey) Unmarshal(buf []byte) *PublicKey {
 	return pub
 }
 
-func (pub *PublicKey) Address(compressed, testnet bool) string {
-	/* var pkb []byte
-	if compressed {
-		pkb = pub.MarshalCompressed()
-	} else {
-		pkb = pub.Marshal()
-	} */
-
-	return "Hello"
-}
-
 // PrivateKey represents an ECDSA private key.
 type PrivateKey struct {
 	PublicKey
