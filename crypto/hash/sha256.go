@@ -6,6 +6,8 @@ package hash
 // Noone in their right mind should use this for any serious reason.
 // This was written purely for educational purposes.
 
+// TODO: Reimplement SHA-256 using the hash.Hash interface as in xripemd160.
+
 import (
 	"encoding/binary"
 	"encoding/hex"
