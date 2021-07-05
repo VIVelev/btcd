@@ -11,9 +11,17 @@ func (op opcode) Equal(other command) bool {
 	return op == x
 }
 
+func (op opcode) String() string {
+	return OpcodeNames[op]
+}
+
 func (el element) Equal(other command) bool {
 	x := other.(element)
 	return bytes.Equal(el, x)
+}
+
+func (el element) String() string {
+	return string(el)
 }
 
 const (
@@ -238,12 +246,12 @@ var OpcodeFunctions = map[opcode]operation{
 var OpcodeNames = map[opcode]string{
 	//
 	// Constants:
-	0: "OP_0",
+	OP_0: "OP_0",
 	// 1-75: serve as elements
-	76: "OP_PUSHDATA1",
-	77: "OP_PUSHDATA2",
-	78: "OP_PUSHDATA4",
-	79: "OP_1NEGATE",
+	OP_PUSHDATA1: "OP_PUSHDATA1",
+	OP_PUSHDATA2: "OP_PUSHDATA2",
+	OP_PUSHDATA4: "OP_PUSHDATA4",
+	OP_1NEGATE:   "OP_1NEGATE",
 	// 80: reserved
 	81: "OP_1",
 	82: "OP_2",

@@ -1,5 +1,13 @@
 package txscript
 
+import "fmt"
+
+// command can be either a opcode or an element
+type command interface {
+	fmt.Stringer
+	Equal(other command) bool
+}
+
 type stack []command
 
 func (s *stack) PushOpcode(c opcode) *stack {
@@ -17,8 +25,37 @@ func (s *stack) Pop() (*stack, command) {
 	if l == 0 {
 		panic("stack is already empty")
 	}
-
 	el := (*s)[l-1]
 	*s = (*s)[:l-1]
 	return s, el
+}
+
+func (s *stack) PopFront() (*stack, command) {
+	l := len(*s)
+	if l == 0 {
+		panic("stack is already empty")
+	}
+	el := (*s)[0]
+	*s = (*s)[1:]
+	return s, el
+}
+
+func (s *stack) Iter() stack {
+	return *s
+}
+
+func (s *stack) Peek() command {
+	l := len(*s)
+	if l == 0 {
+		panic("stack is already empty")
+	}
+	return (*s)[l-1]
+}
+
+func (s *stack) PeekAt(i int) command {
+	l := len(*s)
+	if l == 0 {
+		panic("stack is already empty")
+	}
+	return (*s)[i]
 }

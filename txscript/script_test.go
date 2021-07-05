@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-var cmds = []command{
+var cmds = stack{
 	OP_1,
 	OP_2,
 	OP_2DUP,
@@ -18,7 +18,7 @@ var cmds = []command{
 	OP_EQUAL,
 }
 
-var s = new(Script).SetCmds(cmds)
+var s = new(Script).SetCmds(&cmds)
 
 func TestScriptMarshal(t *testing.T) {
 	buf, _ := s.Marshal()
@@ -31,8 +31,8 @@ func TestScriptUnmarshal(t *testing.T) {
 	buf, _ := s.Marshal()
 	newS := new(Script).Unmarshal(bytes.NewReader(buf))
 
-	for i := range s.Cmds {
-		if s.Cmds[i].Equal(newS.Cmds[i]) {
+	for i := range s.Cmds.Iter() {
+		if s.Cmds.PeekAt(i).Equal(newS.Cmds.PeekAt(i)) {
 			t.Errorf("FAIL")
 		}
 	}

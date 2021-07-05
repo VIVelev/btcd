@@ -10,16 +10,11 @@ import (
 	"github.com/VIVelev/btcd/encoding"
 )
 
-// command can be either a opcode or an element
-type command interface {
-	Equal(other command) bool
-}
-
 type Script struct {
-	Cmds []command
+	Cmds *stack
 }
 
-func (s *Script) SetCmds(cmds []command) *Script {
+func (s *Script) SetCmds(cmds *stack) *Script {
 	s.Cmds = cmds
 	return s
 }
@@ -27,7 +22,7 @@ func (s *Script) SetCmds(cmds []command) *Script {
 func (s *Script) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 
-	for _, cmd := range s.Cmds {
+	for _, cmd := range s.Cmds.Iter() {
 		switch cmd := cmd.(type) {
 		case opcode:
 			binary.Write(buf, binary.LittleEndian, cmd)
@@ -61,7 +56,7 @@ func (s *Script) Marshal() ([]byte, error) {
 }
 
 func (s *Script) Unmarshal(r io.Reader) *Script {
-	var cmds []command
+	s.Cmds = new(stack)
 	length := int(encoding.DecodeVarInt(r).Int64())
 	count := 0
 
@@ -80,25 +75,24 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 		// push commands, interpreting opcodes 1-77
 		if 1 <= current && current <= 75 {
 			// elements of size [1, 75] bytes
-			cmds = append(cmds, readElement(int(current)))
+			s.Cmds.PushElement(readElement(int(current)))
 		} else if current == 76 {
 			// OP_PUSHDATA1: elements of size [76, 255] bytes
 			var elementLength uint8
 			binary.Read(r, binary.LittleEndian, elementLength)
 			count += 1
-			cmds = append(cmds, readElement(int(elementLength)))
+			s.Cmds.PushElement(readElement(int(elementLength)))
 		} else if current == 77 {
 			// OP_PUSHDATA2: elements of size [256, 520] bytes
 			var elementLength uint16
 			binary.Read(r, binary.LittleEndian, elementLength)
 			count += 2
-			cmds = append(cmds, readElement(int(elementLength)))
+			s.Cmds.PushElement(readElement(int(elementLength)))
 		} else {
 			// represents an opcode, add it (as int)
-			cmds = append(cmds, current)
+			s.Cmds.PushOpcode(current)
 		}
 	}
 
-	s.Cmds = cmds
 	return s
 }
