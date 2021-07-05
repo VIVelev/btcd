@@ -69,7 +69,7 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 
 	for count < length {
 		var current opcode
-		binary.Read(r, binary.LittleEndian, current)
+		binary.Read(r, binary.LittleEndian, &current)
 		count += 1
 
 		// push commands, interpreting opcodes 1-77
@@ -79,13 +79,13 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 		} else if current == 76 {
 			// OP_PUSHDATA1: elements of size [76, 255] bytes
 			var elementLength uint8
-			binary.Read(r, binary.LittleEndian, elementLength)
+			binary.Read(r, binary.LittleEndian, &elementLength)
 			count += 1
 			s.Cmds.PushElement(readElement(int(elementLength)))
 		} else if current == 77 {
 			// OP_PUSHDATA2: elements of size [256, 520] bytes
 			var elementLength uint16
-			binary.Read(r, binary.LittleEndian, elementLength)
+			binary.Read(r, binary.LittleEndian, &elementLength)
 			count += 2
 			s.Cmds.PushElement(readElement(int(elementLength)))
 		} else {

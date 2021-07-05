@@ -32,7 +32,7 @@ func TestScriptUnmarshal(t *testing.T) {
 	newS := new(Script).Unmarshal(bytes.NewReader(buf))
 
 	for i := range s.Cmds.Iter() {
-		if s.Cmds.PeekAt(i).Equal(newS.Cmds.PeekAt(i)) {
+		if !s.Cmds.PeekAt(i).Equal(newS.Cmds.PeekAt(i)) {
 			t.Errorf("FAIL")
 		}
 	}
