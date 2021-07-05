@@ -56,6 +56,7 @@ func (s *Script) Marshal() ([]byte, error) {
 }
 
 func (s *Script) Unmarshal(r io.Reader) *Script {
+	// TODO: verify command length and command type
 	s.Cmds = new(stack)
 	length := int(encoding.DecodeVarInt(r).Int64())
 	count := 0

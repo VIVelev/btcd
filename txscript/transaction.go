@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"encoding/binary"
 	"io"
+	"math/big"
+
+	"github.com/VIVelev/btcd/encoding"
 )
 
 func reverse(s []byte) []byte {
@@ -18,6 +21,67 @@ type Tx struct {
 	TxIns    []TxIn
 	TxOuts   []TxOut
 	Locktime uint32
+}
+
+func (t *Tx) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	// marshal Version, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, t.Version)
+	// EncodeVarInt on the number of inputs
+	b, err := encoding.EncodeVarInt(big.NewInt(int64(len(t.TxIns))))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// marshal TxIns
+	for _, in := range t.TxIns {
+		b, err = in.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	// EncodeVarInt on the number of outputs
+	b, err = encoding.EncodeVarInt(big.NewInt(int64(len(t.TxOuts))))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// marshal TxOuts
+	for _, out := range t.TxOuts {
+		b, err = out.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	// marshal Locktime, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, t.Locktime)
+	// return bytes
+	return buf.Bytes(), nil
+}
+
+func (t *Tx) Unmarshal(r io.Reader) *Tx {
+	// Version is 4 bytes, little-endian
+	binary.Read(r, binary.LittleEndian, &t.Version)
+	// VarInt number of inputs
+	numIns := int(encoding.DecodeVarInt(r).Int64())
+	// TxIns
+	t.TxIns = make([]TxIn, numIns)
+	for i := range t.TxIns {
+		t.TxIns[i].Unmarshal(r)
+	}
+	// VarInt number of outputs
+	numOuts := int(encoding.DecodeVarInt(r).Int64())
+	// TxOuts
+	t.TxOuts = make([]TxOut, numOuts)
+	for i := range t.TxOuts {
+		t.TxOuts[i].Unmarshal(r)
+	}
+	// Locktime is 4 bytes, little-endian
+	binary.Read(r, binary.LittleEndian, &t.Locktime)
+	// return Tx
+	return t
 }
 
 type TxIn struct {
