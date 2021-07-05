@@ -29,7 +29,7 @@ type TxIn struct {
 
 func (in *TxIn) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-	// marshal PrevTxId, little-endian
+	// marshal PrevTxId, 32 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevTxId)
 	// marshal PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
@@ -51,7 +51,7 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	// PrevIndex is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.PrevIndex)
 	// ScriptSig
-	in.ScriptSig = *new(Script).Unmarshal(r)
+	in.ScriptSig.Unmarshal(r)
 	// Sequence is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.Sequence)
 	// return TxIn
@@ -59,6 +59,29 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 }
 
 type TxOut struct {
-	Amount       int    // in units of satoshi (1e-8 of a bitcoin)
+	Amount       uint64 // in units of satoshi (1e-8 of a bitcoin)
 	ScriptPubKey Script // locking script
+}
+
+func (out *TxOut) Marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	// marshal Amount, 8 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, out.Amount)
+	// marshal ScriptPubKey
+	b, err := out.ScriptPubKey.Marshal()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// return bytes
+	return buf.Bytes(), nil
+}
+
+func (out *TxOut) Unmarshal(r io.Reader) *TxOut {
+	// Amount is 8 bytes, little-endian
+	binary.Read(r, binary.LittleEndian, &out.Amount)
+	// ScriptPubKey
+	out.ScriptPubKey.Unmarshal(r)
+	// return TxOut
+	return out
 }
