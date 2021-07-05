@@ -3,11 +3,48 @@ package txscript
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
+	"fmt"
 	"io"
 	"math/big"
+	"net/http"
 
+	"github.com/VIVelev/btcd/crypto/hash"
 	"github.com/VIVelev/btcd/encoding"
 )
+
+type TxFetcher struct {
+	cache map[string]Tx
+}
+
+func (f *TxFetcher) GetUrl(testnet bool) string {
+	if testnet {
+		return "https://blockstream.info/testnet/api"
+	}
+	return "https://blockstream.info/api"
+}
+
+func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
+	// TODO: Write cache to a local file
+
+	tx, ok := f.cache[txId]
+	if fresh || !ok {
+		url := fmt.Sprintf("%s/tx/%s/hex", f.GetUrl(testnet), txId)
+		resp, err := http.Get(url)
+		if err != nil {
+			panic(err)
+		}
+		defer resp.Body.Close()
+		tx = Tx{}
+		tx.Unmarshal(resp.Body)
+		if tx.Id() != txId {
+			return Tx{}, errors.New("TxFetcher: IDs don't match")
+		}
+		f.cache[txId] = tx
+	}
+	return tx, nil
+}
 
 func reverse(s []byte) []byte {
 	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
@@ -21,6 +58,15 @@ type Tx struct {
 	TxIns    []TxIn
 	TxOuts   []TxOut
 	Locktime uint32
+}
+
+func (t *Tx) Id() string {
+	b, err := t.Marshal()
+	if err != nil {
+		panic(err)
+	}
+	b32 := hash.Hash256(b)
+	return hex.EncodeToString(reverse(b32[:]))
 }
 
 func (t *Tx) Marshal() ([]byte, error) {
@@ -94,7 +140,7 @@ type TxIn struct {
 func (in *TxIn) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal PrevTxId, 32 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, in.PrevTxId)
+	buf.Write(reverse(append([]byte{}, in.PrevTxId[:]...)))
 	// marshal PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
 	// marshal ScriptSig
@@ -111,7 +157,8 @@ func (in *TxIn) Marshal() ([]byte, error) {
 
 func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	// PrevTxId is 32 bytes, little-endian
-	binary.Read(r, binary.LittleEndian, in.PrevTxId[:])
+	r.Read(in.PrevTxId[:])
+	reverse(in.PrevTxId[:])
 	// PrevIndex is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.PrevIndex)
 	// ScriptSig
