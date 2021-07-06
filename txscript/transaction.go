@@ -71,6 +71,26 @@ func (t *Tx) Id() string {
 	return hex.EncodeToString(reverse(b32[:]))
 }
 
+// Fee returns the fee of this transaction in satoshi
+func (t *Tx) Fee() int {
+	var inputSum, outputSum uint64 = 0, 0
+	for _, in := range t.TxIns {
+		v, err := in.Value()
+		if err != nil {
+			panic(err)
+		}
+		inputSum += v
+	}
+	for _, out := range t.TxOuts {
+		outputSum += out.Amount
+	}
+
+	if outputSum > inputSum {
+		return -int(outputSum - inputSum)
+	}
+	return int(inputSum - outputSum)
+}
+
 func (t *Tx) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal Version, 4 bytes, little-endian
@@ -137,6 +157,7 @@ type TxIn struct {
 	PrevIndex uint32   // UTXO output index in the prev transaction
 	ScriptSig Script   // unlocking script
 	Sequence  uint32   // originally intended for "high frequency trades", with locktime
+	testnet   bool     // whether this tx is on testnet or mainnet
 }
 
 func (in *TxIn) Marshal() ([]byte, error) {
@@ -159,7 +180,7 @@ func (in *TxIn) Marshal() ([]byte, error) {
 
 func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	// PrevTxId is 32 bytes, little-endian
-	r.Read(in.PrevTxId[:])
+	io.ReadFull(r, in.PrevTxId[:])
 	reverse(in.PrevTxId[:])
 	// PrevIndex is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.PrevIndex)
@@ -171,12 +192,22 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	return in
 }
 
-func (in *TxIn) Value(testnet bool) (uint64, error) {
-	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), testnet, false)
+// Value returns the Amount of the UTXO from the previous transaction
+func (in *TxIn) Value() (uint64, error) {
+	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.testnet, false)
 	if err != nil {
 		return 0, err
 	}
 	return tx.TxOuts[in.PrevIndex].Amount, nil
+}
+
+// ScriptPubKey returns the ScriptPubKey of the UTXO from the previous transaction
+func (in *TxIn) ScriptPubKey() (Script, error) {
+	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.testnet, false)
+	if err != nil {
+		return Script{}, err
+	}
+	return tx.TxOuts[in.PrevIndex].ScriptPubKey, nil
 }
 
 type TxOut struct {

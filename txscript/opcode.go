@@ -1,6 +1,9 @@
 package txscript
 
-import "bytes"
+import (
+	"bytes"
+	"encoding/hex"
+)
 
 type operation func(st, altst stack, cmds []command, sighash []byte) bool
 type opcode uint8
@@ -21,7 +24,7 @@ func (el element) Equal(other command) bool {
 }
 
 func (el element) String() string {
-	return string(el)
+	return hex.EncodeToString(el)
 }
 
 const (

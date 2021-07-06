@@ -63,7 +63,7 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 
 	readElement := func(n int) element {
 		el := make(element, n)
-		n, _ = r.Read(el)
+		io.ReadFull(r, el)
 		count += n
 		return el
 	}
