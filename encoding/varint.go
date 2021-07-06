@@ -41,9 +41,9 @@ func EncodeVarInt(i *big.Int) ([]byte, error) {
 }
 
 func DecodeVarInt(r io.Reader) *big.Int {
-	var i [1]byte
-	r.Read(i[:])
-	switch i[0] {
+	var i uint8
+	binary.Read(r, nil, &i)
+	switch i {
 	case 0xfd:
 		var n uint16
 		binary.Read(r, binary.LittleEndian, &n)
@@ -57,6 +57,6 @@ func DecodeVarInt(r io.Reader) *big.Int {
 		binary.Read(r, binary.LittleEndian, &n)
 		return new(big.Int).SetUint64(n)
 	default:
-		return new(big.Int).SetUint64(uint64(i[0]))
+		return new(big.Int).SetUint64(uint64(i))
 	}
 }

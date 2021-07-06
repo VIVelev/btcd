@@ -82,3 +82,17 @@ func TestMarshal(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestInputValue(t *testing.T) {
+	b, _ := hex.DecodeString("d1c789a9c60383bf715f3f6ad9d14b91fe55f3deb369fe5d9280cb1a01793f81")
+	var txId [32]byte
+	copy(txId[:], b)
+	in := TxIn{txId, 0, Script{}, 0xffffffff}
+	val, err := in.Value(false)
+	if err != nil {
+		t.Error(err)
+	}
+	if val != 42505594 {
+		t.Errorf("FAIL")
+	}
+}

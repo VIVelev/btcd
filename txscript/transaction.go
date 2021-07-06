@@ -18,6 +18,8 @@ type TxFetcher struct {
 	cache map[string]Tx
 }
 
+var txFtchr = TxFetcher{map[string]Tx{}}
+
 func (f *TxFetcher) GetUrl(testnet bool) string {
 	if testnet {
 		return "https://blockstream.info/testnet/api"
@@ -33,11 +35,11 @@ func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
 		url := fmt.Sprintf("%s/tx/%s/hex", f.GetUrl(testnet), txId)
 		resp, err := http.Get(url)
 		if err != nil {
-			panic(err)
+			return Tx{}, err
 		}
 		defer resp.Body.Close()
 		tx = Tx{}
-		tx.Unmarshal(resp.Body)
+		tx.Unmarshal(hex.NewDecoder(resp.Body))
 		if tx.Id() != txId {
 			return Tx{}, errors.New("TxFetcher: IDs don't match")
 		}
@@ -167,6 +169,14 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	binary.Read(r, binary.LittleEndian, &in.Sequence)
 	// return TxIn
 	return in
+}
+
+func (in *TxIn) Value(testnet bool) (uint64, error) {
+	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), testnet, false)
+	if err != nil {
+		return 0, err
+	}
+	return tx.TxOuts[in.PrevIndex].Amount, nil
 }
 
 type TxOut struct {
