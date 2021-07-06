@@ -18,7 +18,7 @@ var cmds = stack{
 	OP_EQUAL,
 }
 
-var s = new(Script).SetCmds(&cmds)
+var s = new(Script).SetCmds(cmds)
 
 func TestScriptMarshal(t *testing.T) {
 	buf, _ := s.Marshal()

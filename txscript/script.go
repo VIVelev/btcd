@@ -11,12 +11,16 @@ import (
 )
 
 type Script struct {
-	Cmds *stack
+	Cmds stack
 }
 
-func (s *Script) SetCmds(cmds *stack) *Script {
+func (s *Script) SetCmds(cmds stack) *Script {
 	s.Cmds = cmds
 	return s
+}
+
+func (s *Script) Add(other Script) Script {
+	return *new(Script).SetCmds(stack(append(s.Cmds, other.Cmds...)))
 }
 
 func (s *Script) Marshal() ([]byte, error) {
@@ -57,7 +61,7 @@ func (s *Script) Marshal() ([]byte, error) {
 
 func (s *Script) Unmarshal(r io.Reader) *Script {
 	// TODO: verify command length and command type
-	s.Cmds = new(stack)
+	s.Cmds = stack{}
 	length := int(encoding.DecodeVarInt(r).Int64())
 	count := 0
 
