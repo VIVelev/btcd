@@ -125,3 +125,20 @@ func TestFee(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestSighash(t *testing.T) {
+	tx, err := txFtchr.Fetch(
+		"452c629d67e41baec3ac6f04fe744b4b9617f8f859c63b3002f8684e7a4fee03",
+		false,
+		false,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+
+	want, _ := hex.DecodeString("27e0c5994dec7824e56dec6b2fcb342eb7cdb0d0957c2fce9882f715e85d81a6")
+	b, _ := tx.Sighash(0)
+	if !bytes.Equal(b[:], want) {
+		t.Errorf("FAIL")
+	}
+}
