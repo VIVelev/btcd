@@ -112,3 +112,26 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 
 	return s
 }
+
+func (s *Script) Eval(sighash []byte) bool {
+	stack, altstack, cmds := new(stack), new(stack), s.Cmds.Copy()
+
+	for len(*cmds) > 0 {
+		_, cmd := cmds.PopFront()
+		switch cmd := cmd.(type) {
+		case opcode:
+			if !OpcodeFunctions[cmd](stack, altstack, cmds, sighash) {
+				return false
+			}
+		case element:
+			stack.PushElement(cmd)
+		}
+	}
+
+	if len(*stack) == 0 {
+		return false
+	}
+	_, c := stack.Pop()
+	el := c.(element)
+	return decodeNum(el) != 0
+}

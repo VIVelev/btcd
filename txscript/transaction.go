@@ -40,6 +40,7 @@ func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
 		}
 		defer resp.Body.Close()
 		tx = Tx{}
+		tx.testnet = testnet
 		tx.Unmarshal(hex.NewDecoder(resp.Body))
 		if tx.Id() != txId {
 			return Tx{}, errors.New("TxFetcher: IDs don't match")
@@ -54,6 +55,7 @@ type Tx struct {
 	TxIns    []TxIn
 	TxOuts   []TxOut
 	Locktime uint32
+	testnet  bool
 }
 
 func (t *Tx) Id() string {
@@ -145,6 +147,21 @@ func (t *Tx) Sighash(index int) ([32]byte, error) {
 	return hash.Hash256(b), err
 }
 
+// VerifyInput returns whether the input has a valid signature
+func (t *Tx) VerifyInput(index int) bool {
+	in := t.TxIns[index]
+	spk, err := in.ScriptPubKey()
+	if err != nil {
+		panic(err)
+	}
+	sighash, err := t.Sighash(index)
+	if err != nil {
+		panic(err)
+	}
+	combinedScript := in.ScriptSig.Add(spk)
+	return combinedScript.Eval(sighash[:])
+}
+
 // SignInput signs the input with the index using the private key
 func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// get the signature hash (the message to sign)
@@ -181,6 +198,7 @@ func (t *Tx) Unmarshal(r io.Reader) *Tx {
 	// TxIns
 	t.TxIns = make([]TxIn, numIns)
 	for i := range t.TxIns {
+		t.TxIns[i].testnet = t.testnet
 		t.TxIns[i].Unmarshal(r)
 	}
 	// VarInt number of outputs

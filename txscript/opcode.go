@@ -6,6 +6,7 @@ import (
 	"math"
 
 	"github.com/VIVelev/btcd/crypto/ecdsa"
+	"github.com/VIVelev/btcd/crypto/elliptic"
 	"github.com/VIVelev/btcd/crypto/hash"
 )
 
@@ -147,7 +148,9 @@ func opChecksig(st, _, _ *stack, sighash []byte) bool {
 	derSig := c.(element)
 	derSig = derSig[:len(derSig)-1] // last byte is the HashType
 
-	pubKey := new(ecdsa.PublicKey).Unmarshal(secPubKey)
+	pubKey := new(ecdsa.PublicKey)
+	pubKey.Curve = elliptic.Secp256k1
+	pubKey.Unmarshal(secPubKey)
 	sig := new(ecdsa.Signature).Unmarshal(derSig)
 
 	if sig.Verify(pubKey, sighash) {

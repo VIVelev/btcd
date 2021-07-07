@@ -10,6 +10,20 @@ type command interface {
 
 type stack []command
 
+func (s *stack) Copy() *stack {
+	newStack := new(stack)
+	for _, c := range s.Iter() {
+		switch c := c.(type) {
+		case opcode:
+			newStack.PushOpcode(c)
+		case element:
+			newStack.PushElement(c)
+		}
+	}
+
+	return newStack
+}
+
 func (s *stack) PushOpcode(c opcode) *stack {
 	*s = append(*s, c)
 	return s
