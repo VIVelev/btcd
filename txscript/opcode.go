@@ -3,9 +3,13 @@ package txscript
 import (
 	"bytes"
 	"encoding/hex"
+	"math"
+
+	"github.com/VIVelev/btcd/crypto/ecdsa"
+	"github.com/VIVelev/btcd/crypto/hash"
 )
 
-type operation func(st, altst stack, cmds []command, sighash []byte) bool
+type operation func(st, altst, cmds *stack, sighash []byte) bool
 type opcode uint8
 type element []byte
 
@@ -25,6 +29,133 @@ func (el element) Equal(other command) bool {
 
 func (el element) String() string {
 	return hex.EncodeToString(el)
+}
+
+func encodeNum(n int) (b []byte) {
+	if n == 0 {
+		return []byte("")
+	}
+
+	absNum := int(math.Abs(float64(n)))
+	for absNum > 0 {
+		b = append(b, byte(absNum&0xff))
+		absNum >>= 8
+	}
+
+	negative := n < 0
+	if b[len(b)-1]&0x80 != 0 {
+		if negative {
+			b = append(b, 0x80)
+		} else {
+			b = append(b, 0x00)
+		}
+	} else if negative {
+		b[len(b)-1] |= 0x80
+	}
+
+	return
+}
+
+func decodeNum(b []byte) (n int) {
+	if bytes.Equal(b, []byte("")) {
+		return 0
+	}
+
+	reverse(b) // convert to big-endian
+	var negative bool
+	if b[0]&0x80 != 0 {
+		negative = true
+		n = int(b[0] & 0x7f)
+	} else {
+		negative = false
+		n = int(b[0])
+	}
+
+	for _, c := range b[1:] {
+		n <<= 8
+		n += int(c)
+	}
+	if negative {
+		n = -n
+	}
+
+	return
+}
+
+func opDup(st, _, _ *stack, _ []byte) bool {
+	if len(*st) < 1 {
+		return false
+	}
+	c := st.Peek()
+	switch c := c.(type) {
+	case opcode:
+		st.PushOpcode(c)
+	case element:
+		st.PushElement(c)
+	default:
+		return false
+	}
+	return true
+}
+
+func opHash160(st, _, _ *stack, _ []byte) bool {
+	if len(*st) < 1 {
+		return false
+	}
+	_, c := st.Pop()
+	el := c.(element)
+	h160 := hash.Hash160(el)
+	st.PushElement(h160[:])
+	return true
+}
+
+func opEqual(st, _, _ *stack, _ []byte) bool {
+	if len(*st) < 2 {
+		return false
+	}
+	_, c1 := st.Pop()
+	_, c2 := st.Pop()
+	if c1.Equal(c2) {
+		st.PushElement(encodeNum(1))
+	} else {
+		st.PushElement(encodeNum(0))
+	}
+	return true
+}
+
+func opVerify(st, _, _ *stack, _ []byte) bool {
+	if len(*st) < 1 {
+		return false
+	}
+	_, c := st.Pop()
+	el := c.(element)
+	return decodeNum(el) != 0
+}
+
+func opEqualverify(st, altst, cmds *stack, sighash []byte) bool {
+	return opEqual(st, altst, cmds, sighash) && opVerify(st, altst, cmds, sighash)
+}
+
+func opChecksig(st, _, _ *stack, sighash []byte) bool {
+	if len(*st) < 2 {
+		return false
+	}
+
+	_, c := st.Pop()
+	secPubKey := c.(element)
+	_, c = st.Pop()
+	derSig := c.(element)
+	derSig = derSig[:len(derSig)-1] // last byte is the HashType
+
+	pubKey := new(ecdsa.PublicKey).Unmarshal(secPubKey)
+	sig := new(ecdsa.Signature).Unmarshal(derSig)
+
+	if sig.Verify(pubKey, sighash) {
+		st.PushElement(encodeNum(1))
+	} else {
+		st.PushElement(encodeNum(0))
+	}
+	return true
 }
 
 const (
@@ -181,7 +312,7 @@ var OpcodeFunctions = map[opcode]operation{
 	// 100: opNotif,
 	// 103: opElse,
 	// 104: opEndif,
-	// 105: opVerify,
+	OP_VERIFY: opVerify,
 	// 106: opReturn,
 	// 107: opToaltstack,
 	// 108: opFromaltstack,
@@ -194,7 +325,7 @@ var OpcodeFunctions = map[opcode]operation{
 	// 115: opIfdup,
 	// 116: opDepth,
 	// 117: opDrop,
-	// 118: opDup,
+	OP_DUP: opDup,
 	// 119: opNip,
 	// 120: opOver,
 	// 121: opPick,
@@ -203,8 +334,8 @@ var OpcodeFunctions = map[opcode]operation{
 	// 124: opSwap,
 	// 125: opTuck,
 	// 130: opSize,
-	// 135: opEqual,
-	// 136: opEqualverify,
+	OP_EQUAL:       opEqual,
+	OP_EQUALVERIFY: opEqualverify,
 	// 139: op1add,
 	// 140: op1sub,
 	// 143: opNegate,
@@ -228,9 +359,9 @@ var OpcodeFunctions = map[opcode]operation{
 	// 166: opRipemd160,
 	// 167: opSha1,
 	// 168: opSha256,
-	// 169: opHash160,
+	OP_HASH160: opHash160,
 	// 170: opHash256,
-	// 172: opChecksig,
+	OP_CHECKSIG: opChecksig,
 	// 173: opChecksigverify,
 	// 174: opCheckmultisig,
 	// 175: opCheckmultisigverify,
@@ -280,31 +411,31 @@ var OpcodeNames = map[opcode]string{
 	100: "OP_NOTIF",
 	// 101: reserved
 	// 102: reserved
-	103: "OP_ELSE",
-	104: "OP_ENDIF",
-	105: "OP_VERIFY",
-	106: "OP_RETURN",
+	103:       "OP_ELSE",
+	104:       "OP_ENDIF",
+	OP_VERIFY: "OP_VERIFY",
+	106:       "OP_RETURN",
 	//
 	// Stack:
-	107: "OP_TOALTSTACK",
-	108: "OP_FROMALTSTACK",
-	109: "OP_2DROP",
-	110: "OP_2DUP",
-	111: "OP_3DUP",
-	112: "OP_2OVER",
-	113: "OP_2ROT",
-	114: "OP_2SWAP",
-	115: "OP_IFDUP",
-	116: "OP_DEPTH",
-	117: "OP_DROP",
-	118: "OP_DUP",
-	119: "OP_NIP",
-	120: "OP_OVER",
-	121: "OP_PICK",
-	122: "OP_ROLL",
-	123: "OP_ROT",
-	124: "OP_SWAP",
-	125: "OP_TUCK",
+	107:    "OP_TOALTSTACK",
+	108:    "OP_FROMALTSTACK",
+	109:    "OP_2DROP",
+	110:    "OP_2DUP",
+	111:    "OP_3DUP",
+	112:    "OP_2OVER",
+	113:    "OP_2ROT",
+	114:    "OP_2SWAP",
+	115:    "OP_IFDUP",
+	116:    "OP_DEPTH",
+	117:    "OP_DROP",
+	OP_DUP: "OP_DUP",
+	119:    "OP_NIP",
+	120:    "OP_OVER",
+	121:    "OP_PICK",
+	122:    "OP_ROLL",
+	123:    "OP_ROT",
+	124:    "OP_SWAP",
+	125:    "OP_TUCK",
 	//
 	// Splice:
 	// 126-129: disabled
@@ -312,8 +443,8 @@ var OpcodeNames = map[opcode]string{
 	//
 	// Bitwise logic:
 	// 131-134: disabled
-	135: "OP_EQUAL",
-	136: "OP_EQUALVERIFY",
+	OP_EQUAL:       "OP_EQUAL",
+	OP_EQUALVERIFY: "OP_EQUALVERIFY",
 	// 137: reserved
 	// 138: reserved
 	//
@@ -343,16 +474,16 @@ var OpcodeNames = map[opcode]string{
 	165: "OP_WITHIN",
 	//
 	// Crypto:
-	166: "OP_RIPEMD160",
-	167: "OP_SHA1",
-	168: "OP_SHA256",
-	169: "OP_HASH160",
-	170: "OP_HASH256",
-	171: "OP_CODESEPARATOR",
-	172: "OP_CHECKSIG",
-	173: "OP_CHECKSIGVERIFY",
-	174: "OP_CHECKMULTISIG",
-	175: "OP_CHECKMULTISIGVERIFY",
+	166:         "OP_RIPEMD160",
+	167:         "OP_SHA1",
+	168:         "OP_SHA256",
+	OP_HASH160:  "OP_HASH160",
+	170:         "OP_HASH256",
+	171:         "OP_CODESEPARATOR",
+	OP_CHECKSIG: "OP_CHECKSIG",
+	173:         "OP_CHECKSIGVERIFY",
+	174:         "OP_CHECKMULTISIG",
+	175:         "OP_CHECKMULTISIGVERIFY",
 	//
 	// NOP:
 	176: "OP_NOP1",

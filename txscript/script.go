@@ -10,6 +10,17 @@ import (
 	"github.com/VIVelev/btcd/encoding"
 )
 
+// NewP2PKHScript returns a Pay-to-Public-Key-Hash Script
+func NewP2PKHScript(h160 [20]byte) Script {
+	return *new(Script).SetCmds(stack{
+		OP_DUP,
+		OP_HASH160,
+		element(h160[:]),
+		OP_EQUALVERIFY,
+		OP_CHECKSIG,
+	})
+}
+
 type Script struct {
 	Cmds stack
 }
