@@ -22,9 +22,9 @@ var txFtchr = TxFetcher{map[string]Tx{}}
 
 func (f *TxFetcher) GetUrl(testnet bool) string {
 	if testnet {
-		return "https://blockstream.info/testnet/api"
+		return "https://mempool.space/testnet/api"
 	}
-	return "https://blockstream.info/api"
+	return "https://mempool.space/api"
 }
 
 func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
@@ -84,7 +84,7 @@ func (t *Tx) Fee() int {
 	return int(inputSum - outputSum)
 }
 
-func (t *Tx) Marshal() ([]byte, error) {
+func (t *Tx) marshal(sigIndex int) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal Version, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, t.Version)
@@ -95,12 +95,23 @@ func (t *Tx) Marshal() ([]byte, error) {
 	}
 	buf.Write(b)
 	// marshal TxIns
-	for _, in := range t.TxIns {
-		b, err = in.Marshal()
-		if err != nil {
-			return nil, err
+	// TODO: Maybe this can be done better?
+	if sigIndex == -1 {
+		for _, in := range t.TxIns {
+			b, err = in.Marshal()
+			if err != nil {
+				return nil, err
+			}
+			buf.Write(b)
 		}
-		buf.Write(b)
+	} else {
+		for i, in := range t.TxIns {
+			b, err = in.marshalScriptOverride(i == sigIndex)
+			if err != nil {
+				return nil, err
+			}
+			buf.Write(b)
+		}
 	}
 	// EncodeVarInt on the number of outputs
 	b, err = encoding.EncodeVarInt(big.NewInt(int64(len(t.TxOuts))))
@@ -118,8 +129,23 @@ func (t *Tx) Marshal() ([]byte, error) {
 	}
 	// marshal Locktime, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, t.Locktime)
+	// marshal SIGHASH_ALL, 4 bytes, little-endian, if sigIndex != -1
+	if sigIndex != -1 {
+		sighashAll := uint32(1)
+		binary.Write(buf, binary.LittleEndian, sighashAll)
+	}
 	// return bytes
 	return buf.Bytes(), nil
+}
+
+// Sighash returns the message that needs to get signed for the input with the index
+func (t *Tx) Sighash(index int) ([32]byte, error) {
+	b, err := t.marshal(index)
+	return hash.Hash256(b), err
+}
+
+func (t *Tx) Marshal() ([]byte, error) {
+	return t.marshal(-1)
 }
 
 func (t *Tx) Unmarshal(r io.Reader) *Tx {
@@ -153,22 +179,55 @@ type TxIn struct {
 	testnet   bool     // whether this tx is on testnet or mainnet
 }
 
-func (in *TxIn) Marshal() ([]byte, error) {
+func (in *TxIn) marshal(n int) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal PrevTxId, 32 bytes, little-endian
 	buf.Write(reverse(append([]byte{}, in.PrevTxId[:]...)))
 	// marshal PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
-	// marshal ScriptSig
-	b, err := in.ScriptSig.Marshal()
-	if err != nil {
-		return nil, err
+	var b []byte
+	var err error
+	switch n {
+	case -1:
+		// marshal ScriptSig
+		b, err = in.ScriptSig.Marshal()
+		if err != nil {
+			return nil, err
+		}
+	case 0:
+		// marshal empty Script
+		b, err = new(Script).Marshal()
+		if err != nil {
+			return nil, err
+		}
+	case 1:
+		// marshal ScriptPubKey
+		spk, err := in.ScriptPubKey()
+		if err != nil {
+			return nil, err
+		}
+		b, err = spk.Marshal()
+		if err != nil {
+			return nil, err
+		}
 	}
 	buf.Write(b)
 	// marshal Sequence, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.Sequence)
 	// return bytes
 	return buf.Bytes(), nil
+}
+
+func (in *TxIn) marshalScriptOverride(pubkeyOverride bool) ([]byte, error) {
+	if pubkeyOverride {
+		return in.marshal(1)
+	}
+
+	return in.marshal(0)
+}
+
+func (in *TxIn) Marshal() ([]byte, error) {
+	return in.marshal(-1)
 }
 
 func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
