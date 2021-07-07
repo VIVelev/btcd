@@ -162,6 +162,21 @@ func (t *Tx) VerifyInput(index int) bool {
 	return combinedScript.Eval(sighash[:])
 }
 
+// Verify returns whether this transaction is valid
+func (t *Tx) Verify() bool {
+	if t.Fee() < 0 {
+		return false
+	}
+
+	for i := range t.TxIns {
+		if !t.VerifyInput(i) {
+			return false
+		}
+	}
+
+	return true
+}
+
 // SignInput signs the input with the index using the private key
 func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// get the signature hash (the message to sign)

@@ -152,7 +152,7 @@ func TestVerifyP2PKH(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !newTx.VerifyInput(0) {
+	if !newTx.Verify() {
 		t.Errorf("FAIL")
 	}
 	newTx, err = txFtchr.Fetch(
@@ -163,7 +163,7 @@ func TestVerifyP2PKH(t *testing.T) {
 	if err != nil {
 		t.Error(err)
 	}
-	if !newTx.VerifyInput(0) {
+	if !newTx.Verify() {
 		t.Errorf("FAIL")
 	}
 }
