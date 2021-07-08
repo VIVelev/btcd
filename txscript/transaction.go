@@ -180,16 +180,16 @@ func (t *Tx) Verify() bool {
 // SignInput signs the input with the index using the private key
 func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// get the signature hash (the message to sign)
-	z, err := t.Sighash(index)
+	sighash, err := t.Sighash(index)
 	if err != nil {
 		panic(err)
 	}
 	// get DER signature
-	der := priv.Sign(z[:]).Marshal()
+	der := priv.Sign(sighash[:]).Marshal()
 	// append the SIGHASH_ALL (1) to der
-	sig := append(der, byte(0x01))
+	sig := append(der, 0x01)
 	// calculate SEC pubkey
-	sec := priv.PublicKey.Marshal()
+	sec := priv.PublicKey.MarshalCompressed()
 	// initialize a new ScriptSig
 	scriptSig := new(Script).SetCmds(stack{
 		element(sig),
@@ -198,7 +198,7 @@ func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// update input's ScriptSig
 	t.TxIns[index].ScriptSig = *scriptSig
 
-	return true
+	return t.VerifyInput(index)
 }
 
 func (t *Tx) Marshal() ([]byte, error) {

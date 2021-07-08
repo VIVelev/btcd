@@ -4,8 +4,9 @@ package ecdsa
 
 import (
 	"bytes"
+	"crypto/hmac"
+	"crypto/sha256"
 	"math/big"
-	"math/rand"
 
 	"github.com/VIVelev/btcd/crypto/elliptic"
 	"github.com/VIVelev/btcd/crypto/hash"
@@ -36,18 +37,64 @@ type PrivateKey struct {
 	D *big.Int
 }
 
+func (priv *PrivateKey) deterministicRandomInt(z []byte) *big.Int {
+	length := len(z)
+	k, v := make([]byte, length), make([]byte, length)
+	for i := 0; i < len(z); i++ {
+		k[i] = 0x00
+		v[i] = 0x01
+	}
+	zInt := new(big.Int).SetBytes(z)
+	if zInt.Cmp(priv.Curve.Params().N) == 1 {
+		zInt.Sub(zInt, priv.Curve.Params().N)
+	}
+	z = zInt.Bytes()
+	secretBytes := make([]byte, length)
+	copy(secretBytes[length-(priv.D.BitLen()+7)/8:], priv.D.Bytes())
+
+	b := append(v, 0x00)
+	b = append(b, secretBytes...)
+	b = append(b, z...)
+	h := hmac.New(sha256.New, k)
+	h.Write(b)
+	k = h.Sum(nil)
+	h = hmac.New(sha256.New, k)
+	h.Write(v)
+	v = h.Sum(nil)
+	b = append(v, 0x01)
+	b = append(b, secretBytes...)
+	b = append(b, z...)
+	h = hmac.New(sha256.New, k)
+	h.Write(b)
+	k = h.Sum(nil)
+	h = hmac.New(sha256.New, k)
+	h.Write(v)
+	v = h.Sum(nil)
+
+	for {
+		h = hmac.New(sha256.New, k)
+		h.Write(v)
+		v = h.Sum(nil)
+		candidate := new(big.Int).SetBytes(v)
+		if candidate.Sign() == 1 && candidate.Cmp(priv.Curve.Params().N) == -1 {
+			return candidate
+		}
+		h = hmac.New(sha256.New, k)
+		h.Write(append(v, 0x00))
+		k = h.Sum(nil)
+		h = hmac.New(sha256.New, k)
+		h.Write(v)
+		v = h.Sum(nil)
+	}
+}
+
 // Sign computes the signature pair r and s from D and msgDigest.
 func (priv *PrivateKey) Sign(msgDigest []byte) *Signature {
 	// Obtain the group order n of the curve.
 	n := priv.Curve.Params().N
 
-	// Generate a cryptographically secure random number k between 1 and n-1.
-	// It should be deterministic.
-	rand.Seed(new(big.Int).SetBytes(msgDigest).Int64())
-	kBytes := make([]byte, (priv.Curve.Params().BitSize+7)/8)
 RESTART:
-	rand.Read(kBytes)
-	k := new(big.Int).SetBytes(kBytes)
+	k := priv.deterministicRandomInt(msgDigest)
 	k.Mod(k, n)
 	if k.Sign() == 0 {
 		goto RESTART
@@ -72,6 +119,13 @@ RESTART:
 	sig.s.Mod(sig.s, n)
 	if sig.s.Sign() == 0 {
 		goto RESTART
+	}
+
+	// It turns out that using the low-s value will get nodes to relay our transactions.
+	// This is for malleability reasons.
+	halfN := new(big.Int).Div(n, big.NewInt(2))
+	if sig.s.Cmp(halfN) == 1 {
+		sig.s.Sub(n, sig.s)
 	}
 
 	return sig
