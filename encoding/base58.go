@@ -4,8 +4,8 @@ package encoding
 
 import (
 	"bytes"
-	"math"
 	"math/big"
+	"strings"
 )
 
 const (
@@ -25,9 +25,10 @@ func reverse(s string) string {
 	return string(rns)
 }
 
+var fiftyEight = big.NewInt(58)
+
 func base58encode(buf []byte) string {
 	var chars []byte
-	fiftyEight := big.NewInt(58)
 
 	for n, m := new(big.Int).SetBytes(buf), big.NewInt(0); n.Sign() > 0; {
 		n.DivMod(n, fiftyEight, m)
@@ -45,8 +46,11 @@ func base58encode(buf []byte) string {
 
 func base58decode(s string) []byte {
 	n := big.NewInt(0)
+	v, exp, p := new(big.Int), new(big.Int), new(big.Int)
 	for max, i := len(s)-1, len(s)-1; i >= 0; i-- {
-		n.Add(n, big.NewInt(int64(alphabet[i])*int64(math.Pow(58, float64(max-i)))))
+		v.SetUint64(uint64(strings.Index(alphabet, string(s[i]))))
+		exp.Exp(fiftyEight, p.SetUint64(uint64(max-i)), nil)
+		n.Add(n, v.Mul(v, exp))
 	}
 	return n.Bytes()
 }

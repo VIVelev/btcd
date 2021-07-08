@@ -179,7 +179,7 @@ func TestSignInput(t *testing.T) {
 	priv.PublicKey.X, priv.PublicKey.Y = priv.Curve.ScalarBaseMult(priv.D)
 
 	newTx := Tx{}
-	newTx.testnet = true
+	newTx.Testnet = true
 	newTx.Unmarshal(hex.NewDecoder(strings.NewReader("010000000199a24308080ab26e6fb65c4eccfadf76749bb5bfa8cb08f291320b3c21e56f0d0d00000000ffffffff02408af701000000001976a914d52ad7ca9b3d096a38e752c2018e6fbc40cdf26f88ac80969800000000001976a914507b27411ccf7f16f10297de6cef3f291623eddf88ac00000000")))
 
 	if !newTx.SignInput(0, priv) {

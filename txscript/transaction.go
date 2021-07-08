@@ -40,7 +40,7 @@ func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
 		}
 		defer resp.Body.Close()
 		tx = Tx{}
-		tx.testnet = testnet
+		tx.Testnet = testnet
 		tx.Unmarshal(hex.NewDecoder(resp.Body))
 		if tx.Id() != txId {
 			return Tx{}, errors.New("TxFetcher: IDs don't match")
@@ -55,7 +55,7 @@ type Tx struct {
 	TxIns    []TxIn
 	TxOuts   []TxOut
 	Locktime uint32
-	testnet  bool
+	Testnet  bool
 }
 
 func (t *Tx) Id() string {
@@ -206,14 +206,21 @@ func (t *Tx) Marshal() ([]byte, error) {
 }
 
 func (t *Tx) Unmarshal(r io.Reader) *Tx {
+	var hasGarbage = false
+
 	// Version is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &t.Version)
 	// VarInt number of inputs
 	numIns := int(encoding.DecodeVarInt(r).Int64())
+	if numIns == 0 {
+		hasGarbage = true
+		r.Read(make([]byte, 1)) // garbage byte
+		numIns = int(encoding.DecodeVarInt(r).Int64())
+	}
 	// TxIns
 	t.TxIns = make([]TxIn, numIns)
 	for i := range t.TxIns {
-		t.TxIns[i].testnet = t.testnet
+		t.TxIns[i].Testnet = t.Testnet
 		t.TxIns[i].Unmarshal(r)
 	}
 	// VarInt number of outputs
@@ -224,7 +231,12 @@ func (t *Tx) Unmarshal(r io.Reader) *Tx {
 		t.TxOuts[i].Unmarshal(r)
 	}
 	// Locktime is 4 bytes, little-endian
-	binary.Read(r, binary.LittleEndian, &t.Locktime)
+	if hasGarbage {
+		b, _ := io.ReadAll(r)
+		t.Locktime = binary.LittleEndian.Uint32(b[len(b)-4:])
+	} else {
+		binary.Read(r, binary.LittleEndian, &t.Locktime)
+	}
 	// return Tx
 	return t
 }
@@ -234,7 +246,7 @@ type TxIn struct {
 	PrevIndex uint32   // UTXO output index in the prev transaction
 	ScriptSig Script   // unlocking script
 	Sequence  uint32   // originally intended for "high frequency trades", with locktime
-	testnet   bool     // whether this tx is on testnet or mainnet
+	Testnet   bool     // whether this tx is on testnet or mainnet
 }
 
 func (in *TxIn) marshal(n int) ([]byte, error) {
@@ -304,7 +316,7 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 
 // Value returns the Amount of the UTXO from the previous transaction
 func (in *TxIn) Value() (uint64, error) {
-	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.testnet, false)
+	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
 	if err != nil {
 		return 0, err
 	}
@@ -313,7 +325,7 @@ func (in *TxIn) Value() (uint64, error) {
 
 // ScriptPubKey returns the ScriptPubKey of the UTXO from the previous transaction
 func (in *TxIn) ScriptPubKey() (Script, error) {
-	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.testnet, false)
+	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
 	if err != nil {
 		return Script{}, err
 	}

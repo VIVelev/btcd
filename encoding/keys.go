@@ -36,6 +36,24 @@ func Address(pub *ecdsa.PublicKey, compressed, testnet bool) string {
 	return base58encode(netPkHashCheck[:])
 }
 
+func DecodeAddress(s string) [20]byte {
+	netPkHashCheck := base58decode(s)
+	if len(netPkHashCheck) != 25 {
+		panic("netPkHashCheck has length different than 25")
+	}
+
+	var check [4]byte
+	copy(check[:], netPkHashCheck[21:])
+	checksum := hash.Hash256(netPkHashCheck[:21])
+	if !bytes.Equal(check[:], checksum[:4]) {
+		panic("invalid address")
+	}
+
+	var pkHash160 [20]byte
+	copy(pkHash160[:], netPkHashCheck[1:21])
+	return pkHash160
+}
+
 // AddressToPubKeyHash recovers the public key hash from an address
 // in base58check.
 //
