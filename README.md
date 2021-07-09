@@ -45,7 +45,7 @@ prevTxId := "68389d05ce8c54041dafcf12820d4246f5ca5128b2d414b5317af58a5274d09e"
 prevIndex := 1
 
 // Now construct the input
-txIn := txscript.TxIn{}
+txIn := tx.TxIn{}
 bytes, _ := hex.DecodeString(prevTxId)
 copy(txIn.PrevTxId[:], bytes)
 txIn.PrevIndex = uint32(prevIndex)
@@ -72,8 +72,8 @@ Here is how:
 // Create the target transaction output
 targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
 targetH160, _ := encoding.AddressToPubKeyHash(targetAddress)
-targetScript := txscript.NewP2PKHScript(targetH160)
-targetTxOut := txscript.TxOut{
+targetScript := script.NewP2PKHScript(targetH160)
+targetTxOut := tx.TxOut{
     Amount:       targetAmount,
     ScriptPubKey: targetScript,
 }
@@ -83,8 +83,8 @@ targetTxOut := txscript.TxOut{
 ```golang
 // Create the change transaction output
 changeH160, _ := encoding.AddressToPubKeyHash(address)
-changeScript := txscript.NewP2PKHScript(changeH160)
-changeTxOut := txscript.TxOut{
+changeScript := script.NewP2PKHScript(changeH160)
+changeTxOut := tx.TxOut{
     Amount:       changeAmount,
     ScriptPubKey: changeScript,
 }
@@ -93,7 +93,7 @@ changeTxOut := txscript.TxOut{
 ### 7) We are almost done! Now we need to combine the inputs & outputs into a single transaction.
 ```golang
 // Combine the inputs & outputs in a transaction
-tx := txscript.Tx{
+transaction := tx.Tx{
     Version:  1,
     TxIns:    []txscript.TxIn{txIn},
     TxOuts:   []txscript.TxOut{targetTxOut, changeTxOut},
@@ -102,12 +102,12 @@ tx := txscript.Tx{
 }
 // And sign the inputs please. In this way you verify that the money
 // you are about to spend are, indeed, yours.
-tx.SignInput(0, priv)
+transaction.SignInput(0, priv)
 ```
 
 ### 8) Print the hex of the transaction, so we can broadcast it to the network!
 ```golang
-bytes, _ = tx.Marshal()
+bytes, _ = transaction.Marshal()
 fmt.Printf("Tx's Hex: %s\n", hex.EncodeToString(bytes))
 ```
 Now you can navigate to a service like https://live.blockcypher.com/btc-testnet/pushtx/ and

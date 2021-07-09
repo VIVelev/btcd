@@ -71,7 +71,7 @@ func main() {
 	}
 
 	// Combine the inputs & outputs in a transaction
-	tx := tx.Tx{
+	transaction := tx.Tx{
 		Version:  1,
 		TxIns:    []tx.TxIn{txIn},
 		TxOuts:   []tx.TxOut{targetTxOut, changeTxOut},
@@ -80,9 +80,9 @@ func main() {
 	}
 	// And sign the inputs please. In this way you verify that the money
 	// you are about to spend are, indeed, yours.
-	tx.SignInput(0, priv)
+	transaction.SignInput(0, priv)
 
 	// Print the hex of the transaction, so we can broadcast it to the network!
-	bytes, _ = tx.Marshal()
+	bytes, _ = transaction.Marshal()
 	fmt.Printf("Tx's Hex: %s\n", hex.EncodeToString(bytes))
 }
