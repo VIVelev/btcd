@@ -6,6 +6,8 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"errors"
+	"io"
 	"math/big"
 
 	"github.com/VIVelev/btcd/crypto/elliptic"
@@ -26,9 +28,10 @@ func (pub *PublicKey) MarshalCompressed() []byte {
 	return elliptic.MarshalCompressed(pub.Curve, pub.X, pub.Y)
 }
 
-func (pub *PublicKey) Unmarshal(buf []byte) *PublicKey {
-	pub.X, pub.Y = elliptic.Unmarshal(pub.Curve, buf)
-	return pub
+func (pub *PublicKey) Unmarshal(buf []byte) (*PublicKey, error) {
+	x, y, err := elliptic.Unmarshal(pub.Curve, buf)
+	pub.X, pub.Y = x, y
+	return pub, err
 }
 
 // PrivateKey represents an ECDSA private key.
@@ -71,12 +74,12 @@ func (priv *PrivateKey) deterministicRandomInt(z []byte) *big.Int {
 }
 
 // Sign computes the signature pair r and s from D and msgDigest.
-func (priv *PrivateKey) Sign(msgDigest []byte) *Signature {
+func (priv *PrivateKey) Sign(sighash []byte) *Signature {
 	// Obtain the group order n of the curve.
 	n := priv.Curve.Params().N
 
 RESTART:
-	k := priv.deterministicRandomInt(msgDigest)
+	k := priv.deterministicRandomInt(sighash)
 	k.Mod(k, n)
 	if k.Sign() == 0 {
 		goto RESTART
@@ -93,7 +96,7 @@ RESTART:
 		goto RESTART
 	}
 	// Compute s = (msgDigest + r*D) / k mod n. If s=0, generate another random k and start over.
-	sig.s = new(big.Int).SetBytes(msgDigest)
+	sig.s = new(big.Int).SetBytes(sighash)
 	prod := new(big.Int).Mul(sig.r, priv.D)
 	sig.s.Add(sig.s, prod)
 	kInv := new(big.Int).ModInverse(k, n)
@@ -184,90 +187,87 @@ func (sig *Signature) Marshal() []byte {
 }
 
 // Unmarshal decodes DER format to sig.
-func (sig *Signature) Unmarshal(der []byte) *Signature {
-	s := bytes.NewReader(der)
+func (sig *Signature) Unmarshal(der []byte) (*Signature, error) {
+	r := bytes.NewReader(der)
 
 	// read and validate 0x30 prefix
-	b, err := s.ReadByte()
+	b, err := r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if b != 0x30 {
-		panic("der signatures should begin with 0x30 byte")
+		return nil, errors.New("der signatures should begin with 0x30 byte")
 	}
 
 	// read and validate total-length
-	totalLength, err := s.ReadByte()
+	totalLength, err := r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if totalLength != byte(len(der)-2) {
-		panic("total-length does not match")
+		return nil, errors.New("total-length does not match")
 	}
 
 	// read and validate marker
-	b, err = s.ReadByte()
+	b, err = r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if b != 0x02 {
-		panic("invalid marker")
+		return nil, errors.New("invalid marker")
 	}
 
 	// read r
-	rbLen, err := s.ReadByte()
+	rbLen, err := r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	rb := make([]byte, rbLen)
-	n, err := s.Read(rb)
+	_, err = io.ReadFull(r, rb)
 	if err != nil {
-		panic(err)
-	}
-	if n != int(rbLen) {
-		panic("couldn't read the whole r")
+		return nil, err
 	}
 
 	// read and validate marker
-	b, err = s.ReadByte()
+	b, err = r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	if b != 0x02 {
-		panic("invalid marker")
+		return nil, errors.New("invalid marker")
 	}
 
 	// read s
-	sbLen, err := s.ReadByte()
+	sbLen, err := r.ReadByte()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 	sb := make([]byte, sbLen)
-	n, err = s.Read(sb)
+	_, err = io.ReadFull(r, sb)
 	if err != nil {
-		panic(err)
-	}
-	if n != int(sbLen) {
-		panic("couldn't read the whole s")
+		return nil, err
 	}
 
 	// validate lengths
 	if 6+rbLen+sbLen != byte(len(der)) { // 6 is the number of misc bytes
-		panic("read length doesn't match der length")
+		return nil, errors.New("read length doesn't match der length")
 	}
 
 	sig.r = new(big.Int).SetBytes(rb)
 	sig.s = new(big.Int).SetBytes(sb)
-	return sig
+	return sig, nil
+}
+
+func GenerateKeyFromSecret(c elliptic.Curve, secret *big.Int) *PrivateKey {
+	priv := new(PrivateKey)
+	priv.Curve = c
+	priv.D = secret
+	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(priv.D)
+	return priv
 }
 
 // GenerateKey generates a public and private key pair from the passphrase.
 func GenerateKey(c elliptic.Curve, passphrase string) *PrivateKey {
-	priv := new(PrivateKey)
-	priv.Curve = c
 	buf := hash.Hash256([]byte(passphrase))
-	priv.D = new(big.Int).SetBytes(buf[:])
-	priv.D.Mod(priv.D, priv.Curve.Params().N)
-	priv.PublicKey.X, priv.PublicKey.Y = c.ScalarBaseMult(priv.D)
-	return priv
+	return GenerateKeyFromSecret(c, new(big.Int).SetBytes(buf[:]))
 }

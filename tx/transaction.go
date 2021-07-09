@@ -24,22 +24,22 @@ type Tx struct {
 	Testnet  bool
 }
 
-func (t *Tx) Id() string {
+func (t *Tx) Id() (string, error) {
 	b, err := t.Marshal()
 	if err != nil {
-		panic(err)
+		return "", err
 	}
 	b32 := hash.Hash256(b)
-	return hex.EncodeToString(utils.Reverse(b32[:]))
+	return hex.EncodeToString(utils.Reverse(b32[:])), nil
 }
 
 // Fee returns the fee of this transaction in satoshi
-func (t *Tx) Fee() int {
+func (t *Tx) Fee() (int, error) {
 	var inputSum, outputSum uint64 = 0, 0
 	for _, in := range t.TxIns {
 		v, err := in.Value()
 		if err != nil {
-			panic(err)
+			return 0, err
 		}
 		inputSum += v
 	}
@@ -48,9 +48,9 @@ func (t *Tx) Fee() int {
 	}
 
 	if outputSum > inputSum {
-		return -int(outputSum - inputSum)
+		return -int(outputSum - inputSum), nil
 	}
-	return int(inputSum - outputSum)
+	return int(inputSum - outputSum), nil
 }
 
 func (t *Tx) marshal(sigIndex int) ([]byte, error) {
@@ -113,41 +113,49 @@ func (t *Tx) Sighash(index int) ([32]byte, error) {
 }
 
 // VerifyInput returns whether the input has a valid signature
-func (t *Tx) VerifyInput(index int) bool {
+func (t *Tx) VerifyInput(index int) (bool, error) {
 	in := t.TxIns[index]
 	spk, err := in.ScriptPubKey()
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 	sighash, err := t.Sighash(index)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 	combinedScript := in.ScriptSig.Add(spk...)
-	return combinedScript.Eval(sighash[:])
+	return combinedScript.Eval(sighash[:]), nil
 }
 
 // Verify returns whether this transaction is valid
-func (t *Tx) Verify() bool {
-	if t.Fee() < 0 {
-		return false
+func (t *Tx) Verify() (bool, error) {
+	fee, err := t.Fee()
+	if err != nil {
+		return false, err
+	}
+	if fee < 0 {
+		return false, nil
 	}
 
 	for i := range t.TxIns {
-		if !t.VerifyInput(i) {
-			return false
+		ok, err := t.VerifyInput(i)
+		if err != nil {
+			return false, err
+		}
+		if !ok {
+			return false, nil
 		}
 	}
 
-	return true
+	return true, nil
 }
 
 // SignInput signs the input with the index using the private key
-func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
+func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) (bool, error) {
 	// get the signature hash (the message to sign)
 	sighash, err := t.Sighash(index)
 	if err != nil {
-		panic(err)
+		return false, err
 	}
 	// get DER signature
 	der := priv.Sign(sighash[:]).Marshal()

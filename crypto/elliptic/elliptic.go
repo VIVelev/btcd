@@ -3,6 +3,7 @@
 package elliptic
 
 import (
+	"errors"
 	"math/big"
 )
 
@@ -169,7 +170,7 @@ func MarshalCompressed(curve Curve, x, y *big.Int) []byte {
 }
 
 // Unmarshal deserializes a point (x,y)
-func Unmarshal(curve Curve, buf []byte) (x, y *big.Int) {
+func Unmarshal(curve Curve, buf []byte) (x, y *big.Int, err error) {
 	byteSize := (curve.Params().BitSize + 7) / 8
 
 	// Uncompressed unmarshal.
@@ -180,7 +181,7 @@ func Unmarshal(curve Curve, buf []byte) (x, y *big.Int) {
 	}
 
 	if buf[0] != 2 && buf[0] != 3 {
-		panic("Unmarshal: invalid prefix byte")
+		return nil, nil, errors.New("Unmarshal: invalid prefix byte")
 	}
 
 	// Compressed unmarshal.

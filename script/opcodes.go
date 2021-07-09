@@ -123,7 +123,10 @@ func opChecksig(st, _ *stack, _ Script, sighash []byte) bool {
 	pubKey := new(ecdsa.PublicKey)
 	pubKey.Curve = elliptic.Secp256k1
 	pubKey.Unmarshal(secPubKey)
-	sig := new(ecdsa.Signature).Unmarshal(derSig)
+	sig, err := new(ecdsa.Signature).Unmarshal(derSig)
+	if err != nil {
+		panic(err)
+	}
 
 	if sig.Verify(pubKey, sighash) {
 		st.Push(encodeNum(1))

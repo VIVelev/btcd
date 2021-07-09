@@ -34,7 +34,11 @@ func Fetch(txId string, testnet, fresh bool) (Tx, error) {
 		tx = Tx{}
 		tx.Testnet = testnet
 		tx.Unmarshal(hex.NewDecoder(resp.Body))
-		if tx.Id() != txId {
+		id, err := tx.Id()
+		if err != nil {
+			return Tx{}, err
+		}
+		if id != txId {
 			return Tx{}, errors.New("TxFetcher: IDs don't match")
 		}
 		cache[txId] = tx

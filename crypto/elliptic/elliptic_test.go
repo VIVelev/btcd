@@ -68,7 +68,7 @@ func TestMarshal(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 
-	x, y := Unmarshal(Secp256k1, buf)
+	x, y, _ := Unmarshal(Secp256k1, buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
 		t.Errorf("FAIL")
 	}
@@ -80,7 +80,7 @@ func TestMarshalCompressed(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 
-	x, y := Unmarshal(Secp256k1, buf)
+	x, y, _ := Unmarshal(Secp256k1, buf)
 	if x.Cmp(Secp256k1.Gx) != 0 || y.Cmp(Secp256k1.Gy) != 0 {
 		t.Errorf("FAIL")
 	}

@@ -42,7 +42,7 @@ func TestSignatureMarshalling(t *testing.T) {
 	sig := priv.Sign(msgDigest[:])
 
 	der := sig.Marshal()
-	sig2 := new(Signature).Unmarshal(der)
+	sig2, _ := new(Signature).Unmarshal(der)
 	if sig2.r.Cmp(sig.r) != 0 || sig2.s.Cmp(sig.s) != 0 {
 		t.Errorf("FAIL")
 	}
