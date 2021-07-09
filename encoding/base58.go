@@ -9,16 +9,21 @@ import (
 
 const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-var alphabetInv map[byte]int
+var (
+	alphabetInv map[byte]int
+	fiftyEight  *big.Int
+)
 
 func init() {
 	alphabetInv = make(map[byte]int, 58)
 	for i, c := range alphabet {
 		alphabetInv[byte(c)] = i
 	}
+	fiftyEight = big.NewInt(58)
 }
 
 // reverse takes a string as argument and return the reverse of string.
+// TODO: Maybe deprecate this in favor of utils.Reverse?
 func reverse(s string) string {
 	rns := []rune(s) // convert to rune
 	for i, j := 0, len(rns)-1; i < j; i, j = i+1, j-1 {
@@ -29,8 +34,6 @@ func reverse(s string) string {
 	// return the reversed string.
 	return string(rns)
 }
-
-var fiftyEight = big.NewInt(58)
 
 func base58encode(buf []byte) string {
 	var chars []byte

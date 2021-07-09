@@ -2,7 +2,6 @@ package script
 
 import (
 	"bytes"
-	"encoding/hex"
 	"math"
 
 	"github.com/VIVelev/btcd/crypto/ecdsa"
@@ -11,29 +10,9 @@ import (
 	"github.com/VIVelev/btcd/utils"
 )
 
-type operation func(st, altst, cmds *stack, sighash []byte) bool
-type opcode uint8
-type element []byte
+type operation func(st, altst *stack, cmds Script, sighash []byte) bool
 
-func (op opcode) Equal(other command) bool {
-	x := other.(opcode)
-	return op == x
-}
-
-func (op opcode) String() string {
-	return OpcodeNames[op]
-}
-
-func (el element) Equal(other command) bool {
-	x := other.(element)
-	return bytes.Equal(el, x)
-}
-
-func (el element) String() string {
-	return hex.EncodeToString(el)
-}
-
-func encodeNum(n int) (b []byte) {
+func encodeNum(n int) (b element) {
 	if n == 0 {
 		return []byte("")
 	}
@@ -58,7 +37,7 @@ func encodeNum(n int) (b []byte) {
 	return
 }
 
-func decodeNum(b []byte) (n int) {
+func decodeNum(b element) (n int) {
 	if bytes.Equal(b, []byte("")) {
 		return 0
 	}
@@ -84,48 +63,40 @@ func decodeNum(b []byte) (n int) {
 	return
 }
 
-func opDup(st, _, _ *stack, _ []byte) bool {
+func opDup(st, _ *stack, _ Script, _ []byte) bool {
 	if len(*st) < 1 {
 		return false
 	}
-	c := st.Peek()
-	switch c := c.(type) {
-	case opcode:
-		st.PushOpcode(c)
-	case element:
-		st.PushElement(c)
-	default:
-		return false
-	}
+	st.Push(st.Peek())
 	return true
 }
 
-func opHash160(st, _, _ *stack, _ []byte) bool {
+func opHash160(st, _ *stack, _ Script, _ []byte) bool {
 	if len(*st) < 1 {
 		return false
 	}
 	_, c := st.Pop()
 	el := c.(element)
 	h160 := hash.Hash160(el)
-	st.PushElement(h160[:])
+	st.Push(element(h160[:]))
 	return true
 }
 
-func opEqual(st, _, _ *stack, _ []byte) bool {
+func opEqual(st, _ *stack, _ Script, _ []byte) bool {
 	if len(*st) < 2 {
 		return false
 	}
 	_, c1 := st.Pop()
 	_, c2 := st.Pop()
 	if c1.Equal(c2) {
-		st.PushElement(encodeNum(1))
+		st.Push(encodeNum(1))
 	} else {
-		st.PushElement(encodeNum(0))
+		st.Push(encodeNum(0))
 	}
 	return true
 }
 
-func opVerify(st, _, _ *stack, _ []byte) bool {
+func opVerify(st, _ *stack, _ Script, _ []byte) bool {
 	if len(*st) < 1 {
 		return false
 	}
@@ -134,11 +105,11 @@ func opVerify(st, _, _ *stack, _ []byte) bool {
 	return decodeNum(el) != 0
 }
 
-func opEqualverify(st, altst, cmds *stack, sighash []byte) bool {
+func opEqualverify(st, altst *stack, cmds Script, sighash []byte) bool {
 	return opEqual(st, altst, cmds, sighash) && opVerify(st, altst, cmds, sighash)
 }
 
-func opChecksig(st, _, _ *stack, sighash []byte) bool {
+func opChecksig(st, _ *stack, _ Script, sighash []byte) bool {
 	if len(*st) < 2 {
 		return false
 	}
@@ -155,9 +126,9 @@ func opChecksig(st, _, _ *stack, sighash []byte) bool {
 	sig := new(ecdsa.Signature).Unmarshal(derSig)
 
 	if sig.Verify(pubKey, sighash) {
-		st.PushElement(encodeNum(1))
+		st.Push(encodeNum(1))
 	} else {
-		st.PushElement(encodeNum(0))
+		st.Push(encodeNum(0))
 	}
 	return true
 }

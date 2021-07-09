@@ -12,34 +12,39 @@ import (
 	"github.com/VIVelev/btcd/encoding"
 )
 
+// Script is simply a slice of commands.
+type Script []command
+
 // NewP2PKHScript returns a Pay-to-PubkeyHash Script
 func NewP2PKHScript(h160 [20]byte) Script {
-	return *new(Script).SetCmds(stack{
+	return []command{
 		OP_DUP,
 		OP_HASH160,
 		element(h160[:]),
 		OP_EQUALVERIFY,
 		OP_CHECKSIG,
-	})
+	}
 }
 
-type Script struct {
-	Cmds stack
+func (s *Script) Add(cmds ...command) Script {
+	return append(*s, cmds...)
 }
 
-func (s *Script) SetCmds(cmds stack) *Script {
-	s.Cmds = cmds
-	return s
+func (s *Script) AddBytes(b ...[]byte) Script {
+	els := make([]command, len(b))
+	for i := range b {
+		els[i] = element(b[i])
+	}
+	return s.Add(els...)
 }
 
-func (s *Script) Add(other Script) Script {
-	return *new(Script).SetCmds(stack(append(s.Cmds, other.Cmds...)))
+func (s *Script) copy() Script {
+	return s.Add()
 }
 
 func (s *Script) Marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
-
-	for _, cmd := range s.Cmds.Iter() {
+	for _, cmd := range *s {
 		switch cmd := cmd.(type) {
 		case opcode:
 			binary.Write(buf, binary.LittleEndian, cmd)
@@ -74,7 +79,7 @@ func (s *Script) Marshal() ([]byte, error) {
 
 func (s *Script) Unmarshal(r io.Reader) *Script {
 	// TODO: verify command length and command type
-	s.Cmds = stack{}
+	*s = *new(Script)
 	length := int(encoding.DecodeVarInt(r).Int64())
 	count := 0
 
@@ -93,22 +98,22 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 		// push commands, interpreting opcodes 1-77
 		if 1 <= current && current <= 75 {
 			// elements of size [1, 75] bytes
-			s.Cmds.PushElement(readElement(int(current)))
+			*s = append(*s, readElement(int(current)))
 		} else if current == 76 {
 			// OP_PUSHDATA1: elements of size [76, 255] bytes
 			var elementLength uint8
 			binary.Read(r, binary.LittleEndian, &elementLength)
 			count += 1
-			s.Cmds.PushElement(readElement(int(elementLength)))
+			*s = append(*s, readElement(int(elementLength)))
 		} else if current == 77 {
 			// OP_PUSHDATA2: elements of size [256, 520] bytes
 			var elementLength uint16
 			binary.Read(r, binary.LittleEndian, &elementLength)
 			count += 2
-			s.Cmds.PushElement(readElement(int(elementLength)))
+			*s = append(*s, readElement(int(elementLength)))
 		} else {
 			// represents an opcode, add it (as int)
-			s.Cmds.PushOpcode(current)
+			*s = append(*s, current)
 		}
 	}
 
@@ -116,17 +121,18 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 }
 
 func (s *Script) Eval(sighash []byte) bool {
-	stack, altstack, cmds := new(stack), new(stack), s.Cmds.Copy()
+	stack, altstack, cmds := new(stack), new(stack), s.copy()
 
-	for len(*cmds) > 0 {
-		_, cmd := cmds.PopFront()
+	for len(cmds) > 0 {
+		cmd := cmds[0]
+		cmds = cmds[1:]
 		switch cmd := cmd.(type) {
 		case opcode:
 			if !OpcodeFunctions[cmd](stack, altstack, cmds, sighash) {
 				return false
 			}
 		case element:
-			stack.PushElement(cmd)
+			stack.Push(cmd)
 		}
 	}
 

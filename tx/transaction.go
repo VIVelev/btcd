@@ -123,7 +123,7 @@ func (t *Tx) VerifyInput(index int) bool {
 	if err != nil {
 		panic(err)
 	}
-	combinedScript := in.ScriptSig.Add(spk)
+	combinedScript := in.ScriptSig.Add(spk...)
 	return combinedScript.Eval(sighash[:])
 }
 
@@ -156,11 +156,9 @@ func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// calculate SEC pubkey
 	sec := priv.PublicKey.MarshalCompressed()
 	// initialize a new ScriptSig
-	scriptSig := new(script.Script)
-	scriptSig.Cmds.PushElement(sig)
-	scriptSig.Cmds.PushElement(sec)
+	scriptSig := new(script.Script).AddBytes(sig, sec)
 	// update input's ScriptSig
-	t.TxIns[index].ScriptSig = *scriptSig
+	t.TxIns[index].ScriptSig = scriptSig
 
 	return t.VerifyInput(index)
 }
