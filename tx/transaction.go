@@ -1,54 +1,20 @@
-package txscript
+// Implementation of Bitcoin transaction.
+// Reference: https://en.bitcoin.it/wiki/Transaction
+package tx
 
 import (
 	"bytes"
 	"encoding/binary"
 	"encoding/hex"
-	"errors"
-	"fmt"
 	"io"
 	"math/big"
-	"net/http"
 
 	"github.com/VIVelev/btcd/crypto/ecdsa"
 	"github.com/VIVelev/btcd/crypto/hash"
 	"github.com/VIVelev/btcd/encoding"
+	"github.com/VIVelev/btcd/script"
+	"github.com/VIVelev/btcd/utils"
 )
-
-type TxFetcher struct {
-	cache map[string]Tx
-}
-
-var txFtchr = TxFetcher{map[string]Tx{}}
-
-func (f *TxFetcher) GetUrl(testnet bool) string {
-	if testnet {
-		return "https://mempool.space/testnet/api"
-	}
-	return "https://mempool.space/api"
-}
-
-func (f *TxFetcher) Fetch(txId string, testnet, fresh bool) (Tx, error) {
-	// TODO: Write cache to a local file
-
-	tx, ok := f.cache[txId]
-	if fresh || !ok {
-		url := fmt.Sprintf("%s/tx/%s/hex", f.GetUrl(testnet), txId)
-		resp, err := http.Get(url)
-		if err != nil {
-			return Tx{}, err
-		}
-		defer resp.Body.Close()
-		tx = Tx{}
-		tx.Testnet = testnet
-		tx.Unmarshal(hex.NewDecoder(resp.Body))
-		if tx.Id() != txId {
-			return Tx{}, errors.New("TxFetcher: IDs don't match")
-		}
-		f.cache[txId] = tx
-	}
-	return tx, nil
-}
 
 type Tx struct {
 	Version  uint32
@@ -64,7 +30,7 @@ func (t *Tx) Id() string {
 		panic(err)
 	}
 	b32 := hash.Hash256(b)
-	return hex.EncodeToString(reverse(b32[:]))
+	return hex.EncodeToString(utils.Reverse(b32[:]))
 }
 
 // Fee returns the fee of this transaction in satoshi
@@ -98,7 +64,6 @@ func (t *Tx) marshal(sigIndex int) ([]byte, error) {
 	}
 	buf.Write(b)
 	// marshal TxIns
-	// TODO: Maybe this can be done better?
 	if sigIndex == -1 {
 		for _, in := range t.TxIns {
 			b, err = in.Marshal()
@@ -191,10 +156,9 @@ func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) bool {
 	// calculate SEC pubkey
 	sec := priv.PublicKey.MarshalCompressed()
 	// initialize a new ScriptSig
-	scriptSig := new(Script).SetCmds(stack{
-		element(sig),
-		element(sec),
-	})
+	scriptSig := new(script.Script)
+	scriptSig.Cmds.PushElement(sig)
+	scriptSig.Cmds.PushElement(sec)
 	// update input's ScriptSig
 	t.TxIns[index].ScriptSig = *scriptSig
 
@@ -242,17 +206,17 @@ func (t *Tx) Unmarshal(r io.Reader) *Tx {
 }
 
 type TxIn struct {
-	PrevTxId  [32]byte // prev transaction ID: hash256 of prev tx contents
-	PrevIndex uint32   // UTXO output index in the prev transaction
-	ScriptSig Script   // unlocking script
-	Sequence  uint32   // originally intended for "high frequency trades", with locktime
-	Testnet   bool     // whether this tx is on testnet or mainnet
+	PrevTxId  [32]byte      // prev transaction ID: hash256 of prev tx contents
+	PrevIndex uint32        // UTXO output index in the prev transaction
+	ScriptSig script.Script // unlocking script
+	Sequence  uint32        // originally intended for "high frequency trades", with locktime
+	Testnet   bool          // whether this tx is on testnet or mainnet
 }
 
 func (in *TxIn) marshal(n int) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal PrevTxId, 32 bytes, little-endian
-	buf.Write(reverse(append([]byte{}, in.PrevTxId[:]...)))
+	buf.Write(utils.Reverse(append([]byte{}, in.PrevTxId[:]...)))
 	// marshal PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
 	var b []byte
@@ -266,12 +230,12 @@ func (in *TxIn) marshal(n int) ([]byte, error) {
 		}
 	case 0:
 		// marshal empty Script
-		b, err = new(Script).Marshal()
+		b, err = new(script.Script).Marshal()
 		if err != nil {
 			return nil, err
 		}
 	case 1:
-		// marshal ScriptPubKey
+		// marshal ScriptPubKey instead of ScriptSig
 		spk, err := in.ScriptPubKey()
 		if err != nil {
 			return nil, err
@@ -303,7 +267,7 @@ func (in *TxIn) Marshal() ([]byte, error) {
 func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	// PrevTxId is 32 bytes, little-endian
 	io.ReadFull(r, in.PrevTxId[:])
-	reverse(in.PrevTxId[:])
+	utils.Reverse(in.PrevTxId[:])
 	// PrevIndex is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.PrevIndex)
 	// ScriptSig
@@ -316,7 +280,7 @@ func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 
 // Value returns the Amount of the UTXO from the previous transaction
 func (in *TxIn) Value() (uint64, error) {
-	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
+	tx, err := Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
 	if err != nil {
 		return 0, err
 	}
@@ -324,17 +288,17 @@ func (in *TxIn) Value() (uint64, error) {
 }
 
 // ScriptPubKey returns the ScriptPubKey of the UTXO from the previous transaction
-func (in *TxIn) ScriptPubKey() (Script, error) {
-	tx, err := txFtchr.Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
+func (in *TxIn) ScriptPubKey() (script.Script, error) {
+	tx, err := Fetch(hex.EncodeToString(in.PrevTxId[:]), in.Testnet, false)
 	if err != nil {
-		return Script{}, err
+		return script.Script{}, err
 	}
 	return tx.TxOuts[in.PrevIndex].ScriptPubKey, nil
 }
 
 type TxOut struct {
-	Amount       uint64 // in units of satoshi (1e-8 of a bitcoin)
-	ScriptPubKey Script // locking script
+	Amount       uint64        // in units of satoshi (1e-8 of a bitcoin)
+	ScriptPubKey script.Script // locking script
 }
 
 func (out *TxOut) Marshal() ([]byte, error) {

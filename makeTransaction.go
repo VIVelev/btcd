@@ -7,7 +7,8 @@ import (
 	"github.com/VIVelev/btcd/crypto/ecdsa"
 	"github.com/VIVelev/btcd/crypto/elliptic"
 	"github.com/VIVelev/btcd/encoding"
-	"github.com/VIVelev/btcd/txscript"
+	"github.com/VIVelev/btcd/script"
+	"github.com/VIVelev/btcd/tx"
 )
 
 func main() {
@@ -33,7 +34,7 @@ func main() {
 	prevIndex := 1
 
 	// Now construct the input
-	txIn := txscript.TxIn{}
+	txIn := tx.TxIn{}
 	bytes, _ := hex.DecodeString(prevTxId)
 	copy(txIn.PrevTxId[:], bytes)
 	txIn.PrevIndex = uint32(prevIndex)
@@ -55,25 +56,25 @@ func main() {
 	// Create the target transaction output
 	targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
 	targetH160, _ := encoding.AddressToPubKeyHash(targetAddress)
-	targetScript := txscript.NewP2PKHScript(targetH160)
-	targetTxOut := txscript.TxOut{
+	targetScript := script.NewP2PKHScript(targetH160)
+	targetTxOut := tx.TxOut{
 		Amount:       targetAmount,
 		ScriptPubKey: targetScript,
 	}
 
 	// Create the change transaction output
 	changeH160, _ := encoding.AddressToPubKeyHash(address)
-	changeScript := txscript.NewP2PKHScript(changeH160)
-	changeTxOut := txscript.TxOut{
+	changeScript := script.NewP2PKHScript(changeH160)
+	changeTxOut := tx.TxOut{
 		Amount:       changeAmount,
 		ScriptPubKey: changeScript,
 	}
 
 	// Combine the inputs & outputs in a transaction
-	tx := txscript.Tx{
+	tx := tx.Tx{
 		Version:  1,
-		TxIns:    []txscript.TxIn{txIn},
-		TxOuts:   []txscript.TxOut{targetTxOut, changeTxOut},
+		TxIns:    []tx.TxIn{txIn},
+		TxOuts:   []tx.TxOut{targetTxOut, changeTxOut},
 		Locktime: 0,
 		Testnet:  true,
 	}

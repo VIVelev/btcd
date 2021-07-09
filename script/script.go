@@ -1,4 +1,6 @@
-package txscript
+// Implementation of Bitcoin's Script language.
+// Reference: https://en.bitcoin.it/wiki/Script
+package script
 
 import (
 	"bytes"

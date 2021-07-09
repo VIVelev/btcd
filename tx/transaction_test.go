@@ -1,4 +1,4 @@
-package txscript
+package tx
 
 import (
 	"bytes"
@@ -131,7 +131,7 @@ func TestFee(t *testing.T) {
 }
 
 func TestSighash(t *testing.T) {
-	newTx, err := txFtchr.Fetch(
+	newTx, err := Fetch(
 		"452c629d67e41baec3ac6f04fe744b4b9617f8f859c63b3002f8684e7a4fee03",
 		false,
 		false,
@@ -148,7 +148,7 @@ func TestSighash(t *testing.T) {
 }
 
 func TestVerifyP2PKH(t *testing.T) {
-	newTx, err := txFtchr.Fetch(
+	newTx, err := Fetch(
 		"452c629d67e41baec3ac6f04fe744b4b9617f8f859c63b3002f8684e7a4fee03",
 		false,
 		false,
@@ -159,7 +159,7 @@ func TestVerifyP2PKH(t *testing.T) {
 	if !newTx.Verify() {
 		t.Errorf("FAIL")
 	}
-	newTx, err = txFtchr.Fetch(
+	newTx, err = Fetch(
 		"5418099cc755cb9dd3ebc6cf1a7888ad53a1a3beb5a025bce89eb1bf7f1650a2",
 		true,
 		false,

@@ -1,4 +1,4 @@
-package txscript
+package script
 
 import (
 	"bytes"

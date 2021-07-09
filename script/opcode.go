@@ -1,4 +1,4 @@
-package txscript
+package script
 
 import (
 	"bytes"
@@ -8,6 +8,7 @@ import (
 	"github.com/VIVelev/btcd/crypto/ecdsa"
 	"github.com/VIVelev/btcd/crypto/elliptic"
 	"github.com/VIVelev/btcd/crypto/hash"
+	"github.com/VIVelev/btcd/utils"
 )
 
 type operation func(st, altst, cmds *stack, sighash []byte) bool
@@ -62,7 +63,7 @@ func decodeNum(b []byte) (n int) {
 		return 0
 	}
 
-	reverse(b) // convert to big-endian
+	utils.Reverse(b) // convert to big-endian
 	var negative bool
 	if b[0]&0x80 != 0 {
 		negative = true
