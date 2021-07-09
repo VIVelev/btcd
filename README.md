@@ -1,18 +1,19 @@
 # btcd
 
 A pure Go from-scratch zero-dependecy implementation of Bitcoin for educational purposes.
-It also includes all of the under the hood crypto primitives (`crypto/`) such as SHA-256,
-elliptic curves over finite prime fields math, ECDSA and other.
+It also includes all of the under the hood crypto primitives such as SHA-256, elliptic curves
+over finite prime fields math, ECDSA and other.
 
 ## What can it do?
 
-Right now it can create, validate and broadcast transactions such as Pay-to-PubKey-Hash and
+Right now it can create and validate transactions such as Pay-to-PubKey-Hash and
 all the operations related to it.
 
-### Now you may be asking how can I use `btcd` to create transactions. Well...
+## Now you may be asking how can I use `btcd` to create transactions. Well...
 
-#### 1) You will need to create your own Bitcoin private key, public key and address.
+### 1) You will need to create your own Bitcoin private key, public key and address.
 ```golang
+// Generate your own private key, public key, and address.
 priv := ecdsa.GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
 // Use some secret of yours for the passphrase above.
 pub := priv.PublicKey
@@ -22,24 +23,25 @@ address := encoding.Address(&pub, true, true)
 //     2) Is this address for the testnet or mainnet? - Well, I will use the testnet,
 // because I don't have any spare coins. :)
 
-fmt.Printf("My Bitcoin address is: %s. Send me some coins!", address)
+fmt.Printf("My Bitcoin address is: %s. Send me some coins!\n", address)
 ```
 
-#### 2) Now go get some testnet coins! Sadly, they aren't worth a dime. :(
+### 2) Now go get some testnet coins! Sadly, they aren't worth a dime. :(
 I personally use the following faucet: https://coinfaucet.eu/en/btc-testnet/
 
-#### 3) Lets construct the input of our transaction.
-3.1) You need to get the ID of the transaction that gave you the coins above.
+### 3) Lets construct the input of our transaction.
+#### 3.1) You need to get the ID of the transaction that gave you the coins above.
 Navigate to https://mempool.space/testnet and search your address using the search bar.
-Mine txId was: 68389d05ce8c54041dafcf12820d4246f5ca5128b2d414b5317af58a5274d09e
+Mine txId was: `68389d05ce8c54041dafcf12820d4246f5ca5128b2d414b5317af58a5274d09e`.
 
-3.2) Also, the index of your output (the one with your address). Since my address showed up second
-in the column on the right (the outputs), my index is: 1
+#### 3.2) Also, the index of your output (the one with your address).
+Since my address showed up second in the column on the right (the outputs), my index is: `1`.
 
-3.3) Combining it all: Lets build the transaction input!
+#### 3.3) Combining it all: Lets build the transaction input!
 ```golang
-targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
+// Get the id:
 prevTxId := "68389d05ce8c54041dafcf12820d4246f5ca5128b2d414b5317af58a5274d09e"
+// Get the index:
 prevIndex := 1
 
 // Now construct the input
@@ -50,7 +52,7 @@ txIn.PrevIndex = uint32(prevIndex)
 txIn.Testnet = true
 ```
 
-#### 4) Decide how much coins you want to send me. ;*
+### 4) Decide how much coins you want to send me. ;)
 You decide how much. Also, don't forget the fee!!! Here is what I did:
 ```golang
 myTotalCoinsInSatoshi, _ := txIn.Value() // 1 satoshi = 1e-8 bitcoin
@@ -63,14 +65,13 @@ fee := uint64(1500)
 changeAmount := myTotalCoinsInSatoshi - targetAmount - fee
 ```
 
-#### 5) Lets build the transaction output.
-I want you to send me the coins to: mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv
+### 5) Lets build the transaction output.
+I want you to send me the coins to: `mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv`.
 Here is how:
 ```golang
 // Create the target transaction output
 targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
-var targetH160 [20]byte
-copy(targetH160[:], encoding.Base58decode(targetAddress))
+targetH160 := encoding.DecodeAddress(targetAddress)
 targetScript := txscript.NewP2PKHScript(targetH160)
 targetTxOut := txscript.TxOut{
     Amount:       targetAmount,
@@ -78,11 +79,10 @@ targetTxOut := txscript.TxOut{
 }
 ```
 
-#### 6) Lets not forget amount the change, that's money!
+### 6) Lets not forget amount the change, that's money!
 ```golang
 // Create the change transaction output
-var changeH160 [20]byte
-copy(changeH160[:], encoding.Base58decode(address))
+changeH160 := encoding.DecodeAddress(address)
 changeScript := txscript.NewP2PKHScript(changeH160)
 changeTxOut := txscript.TxOut{
     Amount:       changeAmount,
@@ -90,7 +90,7 @@ changeTxOut := txscript.TxOut{
 }
 ```
 
-#### 7) We are almost done! Now we need to combine the inputs & outputs into a single transaction.
+### 7) We are almost done! Now we need to combine the inputs & outputs into a single transaction.
 ```golang
 // Combine the inputs & outputs in a transaction
 tx := txscript.Tx{
@@ -104,6 +104,17 @@ tx := txscript.Tx{
 // you are about to spend are, indeed, yours.
 tx.SignInput(0, priv)
 ```
+
+### 8) Print the hex of the transaction, so we can broadcast it to the network!
+```golang
+bytes, _ = tx.Marshal()
+fmt.Printf("Tx's Hex: %s\n", hex.EncodeToString(bytes))
+```
+Now you can navigate to a service like https://live.blockcypher.com/btc-testnet/pushtx/ and
+broadcast your transaction to the world! Soon, you will be able to do so directly from btcd.
+
+
+#### The full source of making a transaction is in [makeTransaction.go](./makeTransaction.go)
 
 ## TODO
  - Well, where are the blocks of the blockchain, ha!

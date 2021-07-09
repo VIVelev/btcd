@@ -11,6 +11,7 @@ import (
 )
 
 func main() {
+	// Generate your own private key, public key, and address.
 	priv := ecdsa.GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
 	// Use some secret of yours for the passphrase above.
 	pub := priv.PublicKey
@@ -24,7 +25,11 @@ func main() {
 
 	// Go get some coins! For example from: https://coinfaucet.eu/en/btc-testnet/
 
+	// Lets construct the input of our transaction!
+
+	// Get the id:
 	prevTxId := "68389d05ce8c54041dafcf12820d4246f5ca5128b2d414b5317af58a5274d09e"
+	// Get the index:
 	prevIndex := 1
 
 	// Now construct the input
@@ -34,6 +39,8 @@ func main() {
 	txIn.PrevIndex = uint32(prevIndex)
 	txIn.Testnet = true
 
+	// Decide how much coins to send.
+
 	myTotalCoinsInSatoshi, _ := txIn.Value() // 1 satoshi = 1e-8 bitcoin
 	fmt.Printf("I have %d satoshi.\n", myTotalCoinsInSatoshi)
 	// I will send 60% of my satoshi to myself. :)
@@ -42,6 +49,8 @@ func main() {
 	fee := uint64(1500)
 	// Calculate the change amount, I will send this back to `address`.
 	changeAmount := myTotalCoinsInSatoshi - targetAmount - fee
+
+	// Lets build the transaction outputs!
 
 	// Create the target transaction output
 	targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
@@ -72,7 +81,7 @@ func main() {
 	// you are about to spend are, indeed, yours.
 	tx.SignInput(0, priv)
 
-	// Now get the transaction's serialization in hex:
+	// Print the hex of the transaction, so we can broadcast it to the network!
 	bytes, _ = tx.Marshal()
 	fmt.Printf("Tx's Hex: %s\n", hex.EncodeToString(bytes))
 }
