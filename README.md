@@ -71,7 +71,7 @@ Here is how:
 ```golang
 // Create the target transaction output
 targetAddress := "mwJn1YPMq7y5F8J3LkC5Hxg9PHyZ5K4cFv"
-targetH160 := encoding.DecodeAddress(targetAddress)
+targetH160, _ := encoding.AddressToPubKeyHash(targetAddress)
 targetScript := txscript.NewP2PKHScript(targetH160)
 targetTxOut := txscript.TxOut{
     Amount:       targetAmount,
@@ -82,7 +82,7 @@ targetTxOut := txscript.TxOut{
 ### 6) Lets not forget amount the change, that's money!
 ```golang
 // Create the change transaction output
-changeH160 := encoding.DecodeAddress(address)
+changeH160, _ := encoding.AddressToPubKeyHash(address)
 changeScript := txscript.NewP2PKHScript(changeH160)
 changeTxOut := txscript.TxOut{
     Amount:       changeAmount,

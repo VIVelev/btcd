@@ -34,7 +34,7 @@ func (pub *PublicKey) Unmarshal(buf []byte) *PublicKey {
 // PrivateKey represents an ECDSA private key.
 type PrivateKey struct {
 	PublicKey
-	D *big.Int
+	D *big.Int // this is the secret
 }
 
 func (priv *PrivateKey) deterministicRandomInt(z []byte) *big.Int {
@@ -44,47 +44,29 @@ func (priv *PrivateKey) deterministicRandomInt(z []byte) *big.Int {
 		k[i] = 0x00
 		v[i] = 0x01
 	}
-	zInt := new(big.Int).SetBytes(z)
-	if zInt.Cmp(priv.Curve.Params().N) == 1 {
-		zInt.Sub(zInt, priv.Curve.Params().N)
-	}
-	z = zInt.Bytes()
 	secretBytes := make([]byte, length)
 	copy(secretBytes[length-(priv.D.BitLen()+7)/8:], priv.D.Bytes())
 
-	b := append(v, 0x00)
-	b = append(b, secretBytes...)
-	b = append(b, z...)
-	h := hmac.New(sha256.New, k)
-	h.Write(b)
-	k = h.Sum(nil)
-	h = hmac.New(sha256.New, k)
-	h.Write(v)
-	v = h.Sum(nil)
-	b = append(v, 0x01)
-	b = append(b, secretBytes...)
-	b = append(b, z...)
-	h = hmac.New(sha256.New, k)
-	h.Write(b)
-	k = h.Sum(nil)
-	h = hmac.New(sha256.New, k)
-	h.Write(v)
-	v = h.Sum(nil)
-
-	for {
-		h = hmac.New(sha256.New, k)
+	sha256Hmac := func(k, v []byte) []byte {
+		h := hmac.New(sha256.New, k)
 		h.Write(v)
-		v = h.Sum(nil)
-		candidate := new(big.Int).SetBytes(v)
+		return h.Sum(nil)
+	}
+
+	k = sha256Hmac(k, bytes.Join([][]byte{v, {0x00}, secretBytes, z}, nil))
+	v = sha256Hmac(k, v)
+	k = sha256Hmac(k, bytes.Join([][]byte{v, {0x01}, secretBytes, z}, nil))
+	v = sha256Hmac(k, v)
+
+	candidate := new(big.Int)
+	for {
+		v = sha256Hmac(k, v)
+		candidate.SetBytes(v)
 		if candidate.Sign() == 1 && candidate.Cmp(priv.Curve.Params().N) == -1 {
 			return candidate
 		}
-		h = hmac.New(sha256.New, k)
-		h.Write(append(v, 0x00))
-		k = h.Sum(nil)
-		h = hmac.New(sha256.New, k)
-		h.Write(v)
-		v = h.Sum(nil)
+		k = sha256Hmac(k, append(v, 0x00))
+		v = sha256Hmac(k, v)
 	}
 }
 

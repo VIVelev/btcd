@@ -5,15 +5,20 @@ package encoding
 import (
 	"bytes"
 	"math/big"
-	"strings"
 )
 
-const (
-	alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-)
+const alphabet = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
 
-// reverse takes a string as
-// argument and return the reverse of string.
+var alphabetInv map[byte]int
+
+func init() {
+	alphabetInv = make(map[byte]int, 58)
+	for i, c := range alphabet {
+		alphabetInv[byte(c)] = i
+	}
+}
+
+// reverse takes a string as argument and return the reverse of string.
 func reverse(s string) string {
 	rns := []rune(s) // convert to rune
 	for i, j := 0, len(rns)-1; i < j; i, j = i+1, j-1 {
@@ -48,7 +53,7 @@ func base58decode(s string) []byte {
 	n := big.NewInt(0)
 	v, exp, p := new(big.Int), new(big.Int), new(big.Int)
 	for max, i := len(s)-1, len(s)-1; i >= 0; i-- {
-		v.SetUint64(uint64(strings.Index(alphabet, string(s[i]))))
+		v.SetUint64(uint64(alphabetInv[s[i]]))
 		exp.Exp(fiftyEight, p.SetUint64(uint64(max-i)), nil)
 		n.Add(n, v.Mul(v, exp))
 	}

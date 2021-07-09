@@ -36,38 +36,26 @@ func Address(pub *ecdsa.PublicKey, compressed, testnet bool) string {
 	return base58encode(netPkHashCheck[:])
 }
 
-func DecodeAddress(s string) [20]byte {
+// AddressToPubKeyHash recovers the public key hash from an address
+// in base58check.
+//
+// Returns error if the checksum doesn't match.
+func AddressToPubKeyHash(s string) ([20]byte, error) {
 	netPkHashCheck := base58decode(s)
 	if len(netPkHashCheck) != 25 {
-		panic("netPkHashCheck has length different than 25")
+		return [20]byte{}, errors.New("netPkHashCheck has length different than 25")
 	}
 
 	var check [4]byte
 	copy(check[:], netPkHashCheck[21:])
 	checksum := hash.Hash256(netPkHashCheck[:21])
 	if !bytes.Equal(check[:], checksum[:4]) {
-		panic("invalid address")
+		return [20]byte{}, errors.New("invalid address: checksums don't match")
 	}
 
 	var pkHash160 [20]byte
 	copy(pkHash160[:], netPkHashCheck[1:21])
-	return pkHash160
-}
-
-// AddressToPubKeyHash recovers the public key hash from an address
-// in base58check.
-//
-// Returns error if the checksum doesn't match.
-func AddressToPubKeyHash(address string) ([]byte, error) {
-	netPkHashCheck := base58decode(address)
-	// validate the checksum
-	b := len(netPkHashCheck) - 4
-	checksum := hash.Hash256(netPkHashCheck[:b])
-	if !bytes.Equal(netPkHashCheck[b:], checksum[:4]) {
-		return nil, errors.New("AddressToPubKeyHash: checksum doesn't match")
-	}
-	// return the hash, stripping the version byte and checksum bytes
-	return netPkHashCheck[1:b], nil
+	return pkHash160, nil
 }
 
 // Wif encodes the private key in WIF format.
