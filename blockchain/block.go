@@ -2,9 +2,11 @@ package blockchain
 
 import (
 	"encoding/binary"
+	"encoding/hex"
 	"io"
 	"math/big"
 
+	"github.com/VIVelev/btcd/crypto/hash"
 	"github.com/VIVelev/btcd/utils"
 )
 
@@ -56,6 +58,12 @@ func (b *Block) Unmarshal(r io.Reader) *Block {
 	return b
 }
 
+func (b *Block) Id() string {
+	m := b.Marshal()
+	h256 := hash.Hash256(m[:])
+	return hex.EncodeToString(utils.Reverse(h256[:]))
+}
+
 // Target returns the PoW target based on the bits.
 func (b *Block) Target() *big.Int {
 	exponent := b.Bits[3]
@@ -75,4 +83,13 @@ func (b *Block) Difficulty() *big.Int {
 	power := new(big.Int).Exp(big.NewInt(256), big.NewInt(0x1d-3), nil)
 	lowest.Mul(lowest, power)
 	return lowest.Div(lowest, b.Target())
+}
+
+// VerifyPoW returns whether this block satisfies the PoW.
+func (b *Block) VerifyPoW() bool {
+	m := b.Marshal()
+	h256 := hash.Hash256(m[:])
+	// interpret h256 as little-endian
+	proof := new(big.Int).SetBytes(utils.Reverse(h256[:]))
+	return proof.Cmp(b.Target()) == -1
 }

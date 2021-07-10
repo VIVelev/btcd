@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"math/big"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -68,6 +69,18 @@ func TestDifficulty(t *testing.T) {
 
 	want, _ := new(big.Int).SetString("888171856257", 10)
 	if block.Difficulty().Cmp(want) != 0 {
+		t.Errorf("FAIL")
+	}
+}
+
+func TestVerifyPoW(t *testing.T) {
+	block := new(Block).Unmarshal(bytes.NewReader(blockBytes))
+	if !block.VerifyPoW() {
+		t.Errorf("FAIL")
+	}
+
+	block.Unmarshal(hex.NewDecoder(strings.NewReader("04000000fbedbbf0cfdaf278c094f187f2eb987c86a199da22bbb20400000000000000007b7697b29129648fa08b4bcd13c9d5e60abb973a1efac9c8d573c71c807c56c3d6213557faa80518c3737ec0")))
+	if block.VerifyPoW() {
 		t.Errorf("FAIL")
 	}
 }
