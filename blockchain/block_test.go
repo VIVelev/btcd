@@ -3,6 +3,7 @@ package blockchain
 import (
 	"bytes"
 	"encoding/hex"
+	"math/big"
 	"os"
 	"testing"
 )
@@ -49,6 +50,24 @@ func TestUnmarshal(t *testing.T) {
 	}
 	want, _ = hex.DecodeString("a4ffd71d")
 	if !bytes.Equal(block.Nonce[:], want) {
+		t.Errorf("FAIL")
+	}
+}
+
+func TestTarget(t *testing.T) {
+	block := new(Block).Unmarshal(bytes.NewReader(blockBytes))
+
+	want, _ := new(big.Int).SetString("13ce9000000000000000000000000000000000000000000", 16)
+	if block.Target().Cmp(want) != 0 {
+		t.Errorf("FAIL")
+	}
+}
+
+func TestDifficulty(t *testing.T) {
+	block := new(Block).Unmarshal(bytes.NewReader(blockBytes))
+
+	want, _ := new(big.Int).SetString("888171856257", 10)
+	if block.Difficulty().Cmp(want) != 0 {
 		t.Errorf("FAIL")
 	}
 }

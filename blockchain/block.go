@@ -3,11 +3,12 @@ package blockchain
 import (
 	"encoding/binary"
 	"io"
+	"math/big"
 
 	"github.com/VIVelev/btcd/utils"
 )
 
-// Block represents a Bitcoin block header.
+// Block represents a Bitcoin block header, the metadata of a block.
 type Block struct {
 	Version        uint32
 	HashPrevBlock  [32]byte
@@ -53,4 +54,25 @@ func (b *Block) Unmarshal(r io.Reader) *Block {
 	io.ReadFull(r, b.Nonce[:])
 
 	return b
+}
+
+// Target returns the PoW target based on the bits.
+func (b *Block) Target() *big.Int {
+	exponent := b.Bits[3]
+	coefficient := binary.LittleEndian.Uint32(append(b.Bits[:3], 0x00))
+	// the formula is: coefficient * 256^(exponent - 3)
+	ret := big.NewInt(int64(coefficient))
+	power := new(big.Int).Exp(big.NewInt(256), big.NewInt(int64(exponent-3)), nil)
+	return ret.Mul(ret, power)
+}
+
+// Difficulty returns the block (current mining) difficulty based on the bits.
+// Difficulty is simply a human interpretable form of the target.
+// The difficulty of the genesis block is 1. The formula is as follows:
+//   difficulty = (target of lowest difficulty) / (current target)
+func (b *Block) Difficulty() *big.Int {
+	lowest := big.NewInt(0xffff)
+	power := new(big.Int).Exp(big.NewInt(256), big.NewInt(0x1d-3), nil)
+	lowest.Mul(lowest, power)
+	return lowest.Div(lowest, b.Target())
 }
