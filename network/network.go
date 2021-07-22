@@ -6,62 +6,62 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
-	"math/big"
+	"net"
+	"strings"
+	"time"
 
 	"github.com/VIVelev/btcd/crypto/hash"
-	"github.com/VIVelev/btcd/encoding"
 )
 
 var (
-	MainnetMagic = [4]byte{0xf9, 0xbe, 0xb4, 0xd9}
-	TestnetMagic = [4]byte{0x0b, 0x11, 0x09, 0x07}
+	mainnetMagic = [4]byte{0xf9, 0xbe, 0xb4, 0xd9}
+	testnetMagic = [4]byte{0x0b, 0x11, 0x09, 0x07}
 )
 
-type Message struct {
-	Command string // 12 bytes
+type Envelope struct {
+	Command string // up to 12 bytes
 	Payload []byte
 	Testnet bool
 }
 
-func (m *Message) Marshal() []byte {
+func (e *Envelope) Marshal() []byte {
 	buf := new(bytes.Buffer)
 	// network magic, 4 bytes
-	if m.Testnet {
-		buf.Write(TestnetMagic[:])
+	if e.Testnet {
+		buf.Write(testnetMagic[:])
 	} else {
-		buf.Write(MainnetMagic[:])
+		buf.Write(mainnetMagic[:])
 	}
 	// Command, 12 bytes, human-readable
-	buf.Write([]byte(m.Command))
-	for i := len(m.Command); i < 12; i++ {
+	buf.Write([]byte(e.Command))
+	for i := len(e.Command); i < 12; i++ {
 		buf.WriteByte(0x00)
 	}
 	// Payload length, 4 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, uint32(len(m.Payload)))
+	binary.Write(buf, binary.LittleEndian, uint32(len(e.Payload)))
 	// Payload checksum, first 4 bytes of hash256(Payload)
-	h256 := hash.Hash256(m.Payload)
+	h256 := hash.Hash256(e.Payload)
 	buf.Write(h256[:4])
 	// Payload
-	buf.Write(m.Payload)
+	buf.Write(e.Payload)
 	// return bytes
 	return buf.Bytes()
 }
 
-func (m *Message) Unmarshal(r io.Reader) (*Message, error) {
+func (e *Envelope) Unmarshal(r io.Reader) (*Envelope, error) {
 	// check the network magic
 	var magic [4]byte
 	_, err := io.ReadFull(r, magic[:])
 	if err != nil {
 		return nil, errors.New("connection reset")
 	}
-	if bytes.Equal(magic[:], TestnetMagic[:]) != m.Testnet {
-		return nil, errors.New("invalid magic")
-	}
+	e.Testnet = bytes.Equal(magic[:], testnetMagic[:])
 	// Command, 12 bytes, human-readable
 	var cmdBytes [12]byte
 	io.ReadFull(r, cmdBytes[:])
-	m.Command = string(bytes.TrimRight(cmdBytes[:], "\x00"))
+	e.Command = string(bytes.TrimRight(cmdBytes[:], "\x00"))
 	// Payload length, 4 bytes, little-endian
 	var payloadLength uint32
 	binary.Read(r, binary.LittleEndian, &payloadLength)
@@ -69,93 +69,155 @@ func (m *Message) Unmarshal(r io.Reader) (*Message, error) {
 	var checksum [4]byte
 	io.ReadFull(r, checksum[:])
 	// Payload
-	m.Payload = make([]byte, payloadLength)
-	io.ReadFull(r, m.Payload)
+	e.Payload = make([]byte, payloadLength)
+	io.ReadFull(r, e.Payload)
 
 	// verify checksum
-	h256 := hash.Hash256(m.Payload)
+	h256 := hash.Hash256(e.Payload)
 	if !bytes.Equal(h256[:4], checksum[:]) {
 		return nil, errors.New("checksum doesn't match")
 	}
 
-	return m, nil
+	return e, nil
 }
 
-type messageType interface{}
-
-func MessageTypeToCommand(mt messageType) string {
-	switch mt.(type) {
-	case VersionMsg:
-		return "version"
-	default:
-		return ""
-	}
+// Node is a utility struct used to connect to a single node.
+type Node struct {
+	Conn    net.Conn
+	Testnet bool
+	Logging bool
 }
 
-// When a network address is needed somewhere, this structure is used.
-type NetAddr struct {
-	Time     uint32   // The Time (version >= 31402). Not present in version message.
-	Services uint64   // Same service(s) listed in version.
-	IPv6v4   [16]byte // IPv6 address or IPv4 address.
-	Port     uint16   // Port numbet.
-}
+// Handshake performs Version Handshake
+// ref: https://en.bitcoin.it/wiki/Version_Handshake
+//
+// Local peer (L) connects to a remote peer (R):
+// L -> R: Send version message with the local peer's version
+// L <- R: Send version message back
+// L <- R: Send verack message
+// R:      Sets version to the minimum of the 2 versions
+// L -> R: Send verack message after receiving version message from R
+// L:      Sets version to the minimum of the 2 versions
+func (n *Node) Handshake() error {
+	var err error
 
-func (na *NetAddr) Marshal() (ret [30]byte) {
-	binary.LittleEndian.PutUint32(ret[:4], na.Time)
-	binary.LittleEndian.PutUint64(ret[4:12], na.Services)
-	copy(ret[12:28], na.IPv6v4[:])
-	binary.BigEndian.PutUint16(ret[28:], na.Port)
-	return
-}
-
-func (na *NetAddr) MarshalVersion() (ret [26]byte) {
-	b := na.Marshal()
-	copy(ret[:], b[4:])
-	return
-}
-
-type VersionMsg struct {
-	Version   int32   // Identifies protocol version being used by the node.
-	Services  uint64  // Bitfield of features to be enabled for this connection.
-	Timestamp int64   // Standard UNIX timestamp in seconds.
-	AddrRecv  NetAddr // The network address of the node receiving this message.
-	AddrSndr  NetAddr // The network address of the node sending this message. (can be ignored)
-	Nonce     uint64  // Randomly generated every time. Used to detect connections to self.
-	UserAgent string  // User Agent identifies the software being run.
-	Height    int32   // The last block received by the sending node.
-	Relay     bool    // Whether the remote peer should announce relayed tx, see BIP 0037.
-}
-
-func (vm *VersionMsg) Marshal() ([]byte, error) {
-	buf := new(bytes.Buffer)
-	// Version, 4 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, vm.Version)
-	// Services, 8 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, vm.Services)
-	// Timestamp, 8 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, vm.Timestamp)
-	// AddrRecv, 26 bytes
-	b := vm.AddrRecv.MarshalVersion()
-	buf.Write(b[:])
-	// AddrSndr, 26 bytes
-	b = vm.AddrSndr.MarshalVersion()
-	buf.Write(b[:])
-	// Nonce, 8 bytes, big-endian
-	binary.Write(buf, binary.BigEndian, vm.Nonce)
-	// UserAgent, variable string, so varint first
-	length, err := encoding.EncodeVarInt(big.NewInt(int64(len(vm.UserAgent))))
+	err = n.Write(&VersionMsg{
+		Version:   70015,
+		Services:  0,
+		Timestamp: time.Now().Unix(),
+		AddrRecv: NetAddr{
+			Services: 0,
+			IP:       net.ParseIP("0.0.0.0"),
+			Port:     8333,
+		},
+		AddrSndr: NetAddr{
+			Services: 0,
+			IP:       net.ParseIP("0.0.0.0"),
+			Port:     8333,
+		},
+		Nonce:     0,
+		UserAgent: "/programmingbitcoin:0.1/",
+		Height:    0,
+		Relay:     false,
+	})
 	if err != nil {
-		return nil, err
+		return err
 	}
-	buf.Write(length)
-	buf.Write([]byte(vm.UserAgent))
-	// Height, 4 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, vm.Height)
-	// Relay, boolean
-	if vm.Relay {
-		buf.WriteByte(0x01)
-	} else {
-		buf.WriteByte(0x00)
+	_, err = n.WaitFor("version")
+	if err != nil {
+		return err
 	}
-	return buf.Bytes(), nil
+	_, err = n.WaitFor("verack")
+	if err != nil {
+		return err
+	}
+	err = n.Write(&VerackMsg{})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// Write writes the message to the connection.
+func (n *Node) Write(m message) error {
+	b, err := m.Marshal()
+	if err != nil {
+		return err
+	}
+	e := Envelope{
+		Command: m.Command(),
+		Payload: b,
+		Testnet: n.Testnet,
+	}
+
+	if n.Logging {
+		fmt.Printf("sending %s to %s\n", e.Command, n.Conn.RemoteAddr().String())
+	}
+
+	_, err = n.Conn.Write(e.Marshal())
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// Read reads a message in a envelope from the connection.
+func (n *Node) Read() (*Envelope, error) {
+	var e *Envelope
+	for {
+		var err error
+		e, err = new(Envelope).Unmarshal(n.Conn)
+		if err == nil {
+			break
+		}
+	}
+
+	if n.Logging {
+		fmt.Printf("receiving %s from %s\n", e.Command, n.Conn.RemoteAddr().String())
+	}
+
+	return e, nil
+}
+
+func (n *Node) WaitFor(cmds ...string) (message, error) {
+	if n.Logging {
+		fmt.Printf("Waiting for any of: %v\n", cmds)
+	}
+
+	contains := func(ss []string, s string) bool {
+		for _, x := range ss {
+			if strings.Compare(s, x) == 0 {
+				return true
+			}
+		}
+		return false
+	}
+
+	var command string
+	var e *Envelope
+	for !contains(cmds, command) {
+		var err error
+		e, err = n.Read()
+		if err != nil {
+			return nil, err
+		}
+		command = e.Command
+		switch command {
+		case "version":
+			n.Write(new(VerackMsg))
+		case "verack":
+		default:
+			return nil, fmt.Errorf("unknown command \"%s\"", command)
+		}
+	}
+
+	switch command {
+	case "version":
+		return new(VersionMsg).Unmarshal(bytes.NewReader(e.Payload)), nil
+	case "verack":
+		return nil, nil
+	default:
+		return nil, fmt.Errorf("unknown command \"%s\"", command)
+	}
 }
