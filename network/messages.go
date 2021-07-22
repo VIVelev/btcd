@@ -18,7 +18,7 @@ type NetAddr struct {
 	Port     uint16 // Port numbet.
 }
 
-func (na *NetAddr) Marshal() (ret [30]byte) {
+func (na *NetAddr) marshal() (ret [30]byte) {
 	binary.LittleEndian.PutUint32(ret[:4], na.Time)
 	binary.LittleEndian.PutUint64(ret[4:12], na.Services)
 	copy(ret[12:28], na.IP.To16())
@@ -27,15 +27,15 @@ func (na *NetAddr) Marshal() (ret [30]byte) {
 }
 
 func (na *NetAddr) marshalVersion() (ret [26]byte) {
-	b := na.Marshal()
+	b := na.marshal()
 	copy(ret[:], b[4:])
 	return
 }
 
 type message interface {
-	Command() string
-	Marshal() ([]byte, error)
-	Unmarshal(r io.Reader) message
+	command() string
+	marshal() ([]byte, error)
+	unmarshal(r io.Reader) message
 }
 
 type VersionMsg struct {
@@ -50,11 +50,11 @@ type VersionMsg struct {
 	Relay     bool    // Whether the remote peer should announce relayed tx, see BIP 0037.
 }
 
-func (vm *VersionMsg) Command() string {
+func (vm *VersionMsg) command() string {
 	return "version"
 }
 
-func (vm *VersionMsg) Marshal() ([]byte, error) {
+func (vm *VersionMsg) marshal() ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// Version, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, vm.Version)
@@ -88,21 +88,21 @@ func (vm *VersionMsg) Marshal() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (vm *VersionMsg) Unmarshal(r io.Reader) message {
+func (vm *VersionMsg) unmarshal(r io.Reader) message {
 	// TODO
 	return vm
 }
 
 type VerackMsg struct{}
 
-func (va *VerackMsg) Command() string {
+func (va *VerackMsg) command() string {
 	return "verack"
 }
 
-func (va *VerackMsg) Marshal() ([]byte, error) {
+func (va *VerackMsg) marshal() ([]byte, error) {
 	return []byte(""), nil
 }
 
-func (va *VerackMsg) Unmarshal(r io.Reader) message {
+func (va *VerackMsg) unmarshal(r io.Reader) message {
 	return va
 }

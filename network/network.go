@@ -141,12 +141,12 @@ func (n *Node) Handshake() error {
 
 // Write writes the message to the connection.
 func (n *Node) Write(m message) error {
-	b, err := m.Marshal()
+	b, err := m.marshal()
 	if err != nil {
 		return err
 	}
 	e := Envelope{
-		Command: m.Command(),
+		Command: m.command(),
 		Payload: b,
 		Testnet: n.Testnet,
 	}
@@ -214,7 +214,7 @@ func (n *Node) WaitFor(cmds ...string) (message, error) {
 
 	switch command {
 	case "version":
-		return new(VersionMsg).Unmarshal(bytes.NewReader(e.Payload)), nil
+		return new(VersionMsg).unmarshal(bytes.NewReader(e.Payload)), nil
 	case "verack":
 		return nil, nil
 	default:
