@@ -11,7 +11,7 @@ import (
 	"github.com/VIVelev/btcd/tx"
 )
 
-func main() {
+func makeTransaction() tx.Tx {
 	// Generate your own private key, public key, and address.
 	priv := ecdsa.GenerateKey(elliptic.Secp256k1, "vivelev@icloud.comiamfrombetelgeuse")
 	// Use some secret of yours for the passphrase above.
@@ -85,4 +85,6 @@ func main() {
 	// Print the hex of the transaction, so we can broadcast it to the network!
 	bytes, _ = transaction.Marshal()
 	fmt.Printf("Tx's Hex: %s\n", hex.EncodeToString(bytes))
+
+	return transaction
 }
