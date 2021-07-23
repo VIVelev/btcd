@@ -30,7 +30,7 @@ func (t *Tx) Id() (string, error) {
 		return "", err
 	}
 	b32 := hash.Hash256(b)
-	return hex.EncodeToString(utils.Reverse(b32[:])), nil
+	return hex.EncodeToString(utils.Reversed(b32[:])), nil
 }
 
 // Fee returns the fee of this transaction in satoshi
@@ -222,7 +222,7 @@ type TxIn struct {
 func (in *TxIn) marshal(n int) ([]byte, error) {
 	buf := new(bytes.Buffer)
 	// marshal PrevTxId, 32 bytes, little-endian
-	buf.Write(utils.Reverse(append([]byte{}, in.PrevTxId[:]...)))
+	buf.Write(utils.Reversed(append([]byte{}, in.PrevTxId[:]...)))
 	// marshal PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
 	var b []byte
@@ -273,7 +273,7 @@ func (in *TxIn) Marshal() ([]byte, error) {
 func (in *TxIn) Unmarshal(r io.Reader) *TxIn {
 	// PrevTxId is 32 bytes, little-endian
 	io.ReadFull(r, in.PrevTxId[:])
-	utils.Reverse(in.PrevTxId[:])
+	copy(in.PrevTxId[:], utils.Reversed(in.PrevTxId[:]))
 	// PrevIndex is 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &in.PrevIndex)
 	// ScriptSig

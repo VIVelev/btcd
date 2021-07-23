@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"net"
 
@@ -51,4 +52,30 @@ func partialValidation() {
 		fmt.Printf("received another batch of blocks, now have %d\n", l)
 	}
 	node.Close()
+	// we now have 40,001 blocks total, 80 bytes each in raw, so total of ~3.2MB of data
+
+	// now (partially) validate the blockchain integrity
+	fmt.Println("Validating the blockchain... (partially)")
+	for i, block := range blocks {
+		// validate PoW
+		if !block.VerifyPoW() {
+			panic("PoW not valid")
+		}
+
+		// validate ptr to prev block
+		var expectedPrevBlock [32]byte
+		if i > 0 {
+			b, _ := hex.DecodeString(blocks[i-1].Id())
+			copy(expectedPrevBlock[:], b)
+		}
+		if !bytes.Equal(block.HashPrevBlock[:], expectedPrevBlock[:]) {
+			panic("Ptr to prev block not valid")
+		}
+
+		if i%1000 == 0 {
+			fmt.Printf("on block %d/%d\n", i+1, len(blocks))
+		}
+	}
+
+	fmt.Printf("Success! The blockchain is for sure valid up to block %d\n", len(blocks))
 }

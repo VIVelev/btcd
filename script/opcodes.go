@@ -42,7 +42,7 @@ func decodeNum(b element) (n int) {
 		return 0
 	}
 
-	utils.Reverse(b) // convert to big-endian
+	b = utils.Reversed(b) // convert to big-endian
 	var negative bool
 	if b[0]&0x80 != 0 {
 		negative = true

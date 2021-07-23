@@ -30,9 +30,9 @@ func (b *Block) Marshal() [80]byte {
 	// Version, 4 bytes, little-endian
 	binary.LittleEndian.PutUint32(ret[:4], b.Version)
 	// HashPrevBlock, 32 bytes, little-endian
-	copy(ret[4:36], utils.Reverse(b.HashPrevBlock[:]))
+	copy(ret[4:36], utils.Reversed(b.HashPrevBlock[:]))
 	// HashMerkleRoot, 32 bytes, little-endian
-	copy(ret[36:68], utils.Reverse(b.HashMerkleRoot[:]))
+	copy(ret[36:68], utils.Reversed(b.HashMerkleRoot[:]))
 	// Timestamp, 4 bytes, little-endian
 	binary.LittleEndian.PutUint32(ret[68:72], b.Timestamp)
 	// Bits, 4 bytes
@@ -49,10 +49,10 @@ func (b *Block) Unmarshal(r io.Reader) *Block {
 	// HashPrevBlock, 32 bytes, little-endian
 	var le [32]byte
 	io.ReadFull(r, le[:])
-	copy(b.HashPrevBlock[:], utils.Reverse(le[:]))
+	copy(b.HashPrevBlock[:], utils.Reversed(le[:]))
 	// HashMerkleRoot, 32 bytes, little-endian
 	io.ReadFull(r, le[:])
-	copy(b.HashMerkleRoot[:], utils.Reverse(le[:]))
+	copy(b.HashMerkleRoot[:], utils.Reversed(le[:]))
 	// Timestamp, 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &b.Timestamp)
 	// Bits, 4 bytes
@@ -66,13 +66,16 @@ func (b *Block) Unmarshal(r io.Reader) *Block {
 func (b *Block) Id() string {
 	m := b.Marshal()
 	h256 := hash.Hash256(m[:])
-	return hex.EncodeToString(utils.Reverse(h256[:]))
+	return hex.EncodeToString(utils.Reversed(h256[:]))
 }
 
 // Target returns the PoW target based on the bits.
 func (b *Block) Target() *big.Int {
 	exponent := b.Bits[3]
-	coefficient := binary.LittleEndian.Uint32(append(b.Bits[:3], 0x00))
+	var cb [4]byte
+	copy(cb[:], b.Bits[:3])
+	cb[3] = 0x00
+	coefficient := binary.LittleEndian.Uint32(cb[:])
 	// the formula is: coefficient * 256^(exponent - 3)
 	ret := big.NewInt(int64(coefficient))
 	power := new(big.Int).Exp(big.NewInt(256), big.NewInt(int64(exponent-3)), nil)
@@ -95,6 +98,6 @@ func (b *Block) VerifyPoW() bool {
 	m := b.Marshal()
 	h256 := hash.Hash256(m[:])
 	// interpret h256 as little-endian
-	proof := new(big.Int).SetBytes(utils.Reverse(h256[:]))
+	proof := new(big.Int).SetBytes(utils.Reversed(h256[:]))
 	return proof.Cmp(b.Target()) == -1
 }

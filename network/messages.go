@@ -138,7 +138,7 @@ func (gh *GetHeadersMsg) marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(utils.Reverse(b))
+	buf.Write(utils.Reversed(b))
 	if len(gh.EndBlock) != 64 {
 		return nil, errors.New("EndBlock must be of len 64 (256 bits)")
 	}
@@ -146,7 +146,7 @@ func (gh *GetHeadersMsg) marshal() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	buf.Write(utils.Reverse(b))
+	buf.Write(utils.Reversed(b))
 
 	return buf.Bytes(), nil
 }

@@ -214,6 +214,7 @@ func (n *Node) WaitFor(cmds ...string) (message, error) {
 		case "feefilter":
 		case "headers":
 		case "inv":
+		case "addr":
 		default:
 			return nil, fmt.Errorf("unknown command \"%s\"", command)
 		}
