@@ -101,6 +101,7 @@ type Node struct {
 func (n *Node) Handshake() error {
 	var err error
 
+	// TODO: this version message is hardcoded
 	err = n.Write(&VersionMsg{
 		Version:   70015,
 		Services:  0,
@@ -123,16 +124,14 @@ func (n *Node) Handshake() error {
 	if err != nil {
 		return err
 	}
-	_, err = n.WaitFor("version")
-	if err != nil {
+
+	if _, err = n.WaitFor("version"); err != nil {
 		return err
 	}
-	_, err = n.WaitFor("verack")
-	if err != nil {
+	if _, err = n.WaitFor("verack"); err != nil {
 		return err
 	}
-	err = n.Write(&VerackMsg{})
-	if err != nil {
+	if err = n.Write(&VerackMsg{}); err != nil {
 		return err
 	}
 
@@ -205,8 +204,16 @@ func (n *Node) WaitFor(cmds ...string) (message, error) {
 		command = e.Command
 		switch command {
 		case "version":
-			n.Write(new(VerackMsg))
 		case "verack":
+		case "sendheaders":
+		case "sendcmpct":
+		case "ping":
+			msg := new(PingMsg)
+			msg.unmarshal(bytes.NewReader(e.Payload))
+			n.Write(&PongMsg{Nonce: msg.Nonce})
+		case "feefilter":
+		case "headers":
+		case "inv":
 		default:
 			return nil, fmt.Errorf("unknown command \"%s\"", command)
 		}
@@ -217,6 +224,8 @@ func (n *Node) WaitFor(cmds ...string) (message, error) {
 		return new(VersionMsg).unmarshal(bytes.NewReader(e.Payload)), nil
 	case "verack":
 		return nil, nil
+	case "headers":
+		return new(HeadersMsg).unmarshal(bytes.NewReader(e.Payload)), nil
 	default:
 		return nil, fmt.Errorf("unknown command \"%s\"", command)
 	}

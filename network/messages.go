@@ -184,3 +184,41 @@ func (hm *HeadersMsg) unmarshal(r io.Reader) message {
 
 	return hm
 }
+
+type PingMsg struct {
+	Nonce uint64 // Random nonce.
+}
+
+func (p *PingMsg) command() string {
+	return "ping"
+}
+
+func (p *PingMsg) marshal() ([]byte, error) {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], p.Nonce)
+	return buf[:], nil
+}
+
+func (p *PingMsg) unmarshal(r io.Reader) message {
+	binary.Read(r, binary.BigEndian, &(p.Nonce))
+	return p
+}
+
+type PongMsg struct {
+	Nonce uint64 // Nonce from Ping.
+}
+
+func (p *PongMsg) command() string {
+	return "pong"
+}
+
+func (p *PongMsg) marshal() ([]byte, error) {
+	var buf [8]byte
+	binary.BigEndian.PutUint64(buf[:], p.Nonce)
+	return buf[:], nil
+}
+
+func (p *PongMsg) unmarshal(r io.Reader) message {
+	binary.Read(r, binary.BigEndian, &(p.Nonce))
+	return p
+}

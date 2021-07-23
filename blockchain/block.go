@@ -10,6 +10,11 @@ import (
 	"github.com/VIVelev/btcd/utils"
 )
 
+var (
+	MainGenesisBlockBytes, _ = hex.DecodeString("0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4a29ab5f49ffff001d1dac2b7c")
+	TestGenesisBlockBytes, _ = hex.DecodeString("0100000000000000000000000000000000000000000000000000000000000000000000003ba3edfd7a7b12b27ac72c3e67768f617fc81bc3888a51323a9fb8aa4b1e5e4adae5494dffff001d1aa4ae18")
+)
+
 // Block represents a Bitcoin block header, the metadata of a block.
 type Block struct {
 	Version        uint32
