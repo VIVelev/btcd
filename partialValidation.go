@@ -77,5 +77,5 @@ func partialValidation() {
 		}
 	}
 
-	fmt.Printf("Success! The blockchain is for sure valid up to block %d\n", len(blocks))
+	fmt.Printf("Success! The blockchain is for sure valid up to block %d.\n", len(blocks))
 }

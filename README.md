@@ -116,11 +116,6 @@ broadcast your transaction to the world! Soon, you will be able to do so directl
 
 #### The full source of making a transaction is in [makeTransaction.go](./makeTransaction.go)
 
-## TODO
- - Well, where are the blocks of the blockchain, ha!
- - Bitcoin's p2p protocol, so I can run a (full) node.
- - Maybe something else that I am missing...
-
 ## Unit tests
 ```bash
 $ go test ./...
