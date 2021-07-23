@@ -176,7 +176,10 @@ func (hm *HeadersMsg) unmarshal(r io.Reader) message {
 		// only request the headers. This is done so that the same code can be
 		// used to decode the "block" message, which contains the full block
 		// information with all the transactions attached.
-		encoding.DecodeVarInt(r)
+		numTxs := encoding.DecodeVarInt(r)
+		if numTxs.Sign() != 0 {
+			return nil
+		}
 	}
 
 	return hm

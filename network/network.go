@@ -221,3 +221,7 @@ func (n *Node) WaitFor(cmds ...string) (message, error) {
 		return nil, fmt.Errorf("unknown command \"%s\"", command)
 	}
 }
+
+func (n *Node) Close() error {
+	return n.Conn.Close()
+}

@@ -61,8 +61,10 @@ func TestHandshake(t *testing.T) {
 		Testnet: true,
 		Logging: false,
 	}
-	err = node.Handshake()
-	if err != nil {
+	if err = node.Handshake(); err != nil {
+		t.Error(err)
+	}
+	if err = node.Close(); err != nil {
 		t.Error(err)
 	}
 }
