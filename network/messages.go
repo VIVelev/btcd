@@ -9,6 +9,7 @@ import (
 	"math/big"
 	"net"
 
+	"github.com/VIVelev/btcd/blockchain"
 	"github.com/VIVelev/btcd/encoding"
 	"github.com/VIVelev/btcd/utils"
 )
@@ -103,7 +104,7 @@ func (va *VerackMsg) command() string {
 }
 
 func (va *VerackMsg) marshal() ([]byte, error) {
-	return []byte(""), nil
+	return []byte{0}, nil
 }
 
 func (va *VerackMsg) unmarshal(r io.Reader) message {
@@ -153,4 +154,30 @@ func (gh *GetHeadersMsg) marshal() ([]byte, error) {
 func (gh *GetHeadersMsg) unmarshal(r io.Reader) message {
 	// TODO
 	return gh
+}
+
+type HeadersMsg struct {
+	Headers []*blockchain.Block
+}
+
+func (hm *HeadersMsg) command() string {
+	return "headers"
+}
+
+func (hm *HeadersMsg) marshal() ([]byte, error) {
+	return []byte{0}, nil
+}
+
+func (hm *HeadersMsg) unmarshal(r io.Reader) message {
+	count := encoding.DecodeVarInt(r)
+	for i := 0; i < int(count.Int64()); i++ {
+		hm.Headers = append(hm.Headers, new(blockchain.Block).Unmarshal(r))
+		// The number of transactions is also given and is always zero if we
+		// only request the headers. This is done so that the same code can be
+		// used to decode the "block" message, which contains the full block
+		// information with all the transactions attached.
+		encoding.DecodeVarInt(r)
+	}
+
+	return hm
 }
