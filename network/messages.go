@@ -3,11 +3,14 @@ package network
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/hex"
+	"errors"
 	"io"
 	"math/big"
 	"net"
 
 	"github.com/VIVelev/btcd/encoding"
+	"github.com/VIVelev/btcd/utils"
 )
 
 // When a network address is needed somewhere, this structure is used.
@@ -105,4 +108,49 @@ func (va *VerackMsg) marshal() ([]byte, error) {
 
 func (va *VerackMsg) unmarshal(r io.Reader) message {
 	return va
+}
+
+type GetHeadersMsg struct {
+	Version    int32  // The protocol version.
+	NumHashes  int32  // VarInt. Number of block locator hash entries; can be >1 upon chain split.
+	StartBlock string // Block locator object. [32]byte
+	EndBlock   string // Hash of last desired block; set to zero for as many blocks as possible.
+}
+
+func (gh *GetHeadersMsg) command() string {
+	return "getheaders"
+}
+
+func (gh *GetHeadersMsg) marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	binary.Write(buf, binary.LittleEndian, gh.Version)
+	b, err := encoding.EncodeVarInt(big.NewInt(int64(gh.NumHashes)))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+
+	if len(gh.StartBlock) != 64 {
+		return nil, errors.New("StartBlock must be of len 64 (256 bits)")
+	}
+	b, err = hex.DecodeString(gh.StartBlock)
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(utils.Reverse(b))
+	if len(gh.EndBlock) != 64 {
+		return nil, errors.New("EndBlock must be of len 64 (256 bits)")
+	}
+	b, err = hex.DecodeString(gh.EndBlock)
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(utils.Reverse(b))
+
+	return buf.Bytes(), nil
+}
+
+func (gh *GetHeadersMsg) unmarshal(r io.Reader) message {
+	// TODO
+	return gh
 }

@@ -34,3 +34,17 @@ func TestVersionMsgMarshal(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestGetHeadersMsgMarshal(t *testing.T) {
+	gh := GetHeadersMsg{
+		Version:    70015,
+		NumHashes:  1,
+		StartBlock: "0000000000000000001237f46acddf58578a37e213d2a6edc4884a2fcad05ba3",
+		EndBlock:   "0000000000000000000000000000000000000000000000000000000000000000",
+	}
+	b, _ := gh.marshal()
+	want, _ := hex.DecodeString("7f11010001a35bd0ca2f4a88c4eda6d213e2378a5758dfcd6af437120000000000000000000000000000000000000000000000000000000000000000000000000000000000")
+	if !bytes.Equal(b, want) {
+		t.Errorf("FAIL")
+	}
+}
