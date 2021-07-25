@@ -222,3 +222,41 @@ func (p *PongMsg) unmarshal(r io.Reader) message {
 	binary.Read(r, binary.BigEndian, &(p.Nonce))
 	return p
 }
+
+type FilterloadMsg struct {
+	BloomFilter
+	Flags uint8 // A set of flags that control how matched items are added to the filter.
+}
+
+func (f *FilterloadMsg) command() string {
+	return "filterload"
+}
+
+func (f *FilterloadMsg) marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	// start with the size of the filter in bytes
+	b, err := encoding.EncodeVarInt(big.NewInt(int64(f.Size)))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// next add the BitField
+	b, err = f.bytes()
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// NumHashFuncs, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, f.NumHashFuncs)
+	// Tweak, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, f.Tweak)
+	// Flag, 1 byte
+	buf.WriteByte(byte(f.Flags))
+
+	return buf.Bytes(), nil
+}
+
+func (f *FilterloadMsg) unmarshal(r io.Reader) message {
+	// TODO
+	return f
+}

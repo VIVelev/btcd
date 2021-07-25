@@ -57,3 +57,20 @@ func TestHeadersMsgUnmarshal(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestFilterloadMsgMarshal(t *testing.T) {
+	bf := BloomFilter{
+		Size:         10,
+		NumHashFuncs: 5,
+		Tweak:        99,
+	}
+	bf.BitField = make([]byte, bf.Size*8)
+	bf.Add([]byte("Hello World"))
+	bf.Add([]byte("Goodbye!"))
+	msg := FilterloadMsg{BloomFilter: bf, Flags: 1}
+	want, _ := hex.DecodeString("0a4000600a080000010940050000006300000001")
+	b, _ := msg.marshal()
+	if !bytes.Equal(b, want) {
+		t.Errorf("FAIL")
+	}
+}

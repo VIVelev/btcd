@@ -6,7 +6,7 @@ import (
 	"github.com/VIVelev/btcd/crypto/hash"
 )
 
-const BIP0037SEED = uint32(0xfba4c795)
+const bip0037seed = uint32(0xfba4c795)
 
 // Bloom filter as used in the Bitcoin protocol.
 // https://en.wikipedia.org/wiki/Bloom_filter
@@ -21,13 +21,13 @@ type BloomFilter struct {
 func (b *BloomFilter) Add(item []byte) {
 	bitfieldSize := b.Size * 8
 	for i := uint32(0); i < b.NumHashFuncs; i++ {
-		seed := i*BIP0037SEED + b.Tweak
+		seed := i*bip0037seed + b.Tweak
 		h := hash.Murmur3(item, seed)
 		b.BitField[h%bitfieldSize] = 1
 	}
 }
 
-func (b *BloomFilter) FilterBytes() ([]byte, error) {
+func (b *BloomFilter) bytes() ([]byte, error) {
 	if len(b.BitField)%8 != 0 {
 		return nil, errors.New("BitField must have length divisible by 8")
 	}
