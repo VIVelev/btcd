@@ -14,6 +14,13 @@ import (
 	"github.com/VIVelev/btcd/utils"
 )
 
+const (
+	TxDataType = iota + 1
+	BlockDataType
+	FilteredBlockDataType
+	CompactBlockDataType
+)
+
 // When a network address is needed somewhere, this structure is used.
 type NetAddr struct {
 	Time     uint32 // The Time (version >= 31402). Not present in version message.
@@ -259,4 +266,51 @@ func (f *FilterloadMsg) marshal() ([]byte, error) {
 func (f *FilterloadMsg) unmarshal(r io.Reader) message {
 	// TODO
 	return f
+}
+
+// Inventory vectors are used for notifying other nodes
+// about objects they have or data which is being requested.
+type InventoryVector struct {
+	Type uint32   // Identifies the object type linked to this inventory.
+	Hash [32]byte // Hash of the object.
+}
+
+func (iv *InventoryVector) marshal() (ret [36]byte) {
+	binary.LittleEndian.PutUint32(ret[:4], iv.Type)
+	copy(ret[4:], utils.Reversed(iv.Hash[:]))
+	return
+}
+
+type GetDataMsg struct {
+	Inventory []InventoryVector
+}
+
+func (gd *GetDataMsg) Add(v InventoryVector) {
+	gd.Inventory = append(gd.Inventory, v)
+}
+
+func (gd *GetDataMsg) command() string {
+	return "getdata"
+}
+
+func (gd *GetDataMsg) marshal() ([]byte, error) {
+	buf := new(bytes.Buffer)
+	// start with the number of inventory vectors as a varint
+	b, err := encoding.EncodeVarInt(big.NewInt(int64(len(gd.Inventory))))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// marshal each inventory vector
+	for _, v := range gd.Inventory {
+		b := v.marshal()
+		buf.Write(b[:])
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (gd *GetDataMsg) unmarshal(r io.Reader) message {
+	// TODO
+	return gd
 }

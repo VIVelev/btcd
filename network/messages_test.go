@@ -74,3 +74,23 @@ func TestFilterloadMsgMarshal(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestGetDataMsgMarshal(t *testing.T) {
+	gd := new(GetDataMsg)
+	block, _ := hex.DecodeString("00000000000000cac712b726e4326e596170574c01a16001692510c44025eb30")
+	iv := new(InventoryVector)
+	copy(iv.Hash[:], block)
+	iv.Type = FilteredBlockDataType
+	gd.Add(*iv)
+	block, _ = hex.DecodeString("00000000000000beb88910c46f6b442312361c6693a7fb52065b583979844910")
+	iv = new(InventoryVector)
+	copy(iv.Hash[:], block)
+	iv.Type = FilteredBlockDataType
+	gd.Add(*iv)
+
+	want, _ := hex.DecodeString("020300000030eb2540c41025690160a1014c577061596e32e426b712c7ca00000000000000030000001049847939585b0652fba793661c361223446b6fc41089b8be00000000000000")
+	b, _ := gd.marshal()
+	if !bytes.Equal(b, want) {
+		t.Errorf("FAIL")
+	}
+}
