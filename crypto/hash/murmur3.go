@@ -1,96 +1,45 @@
 package hash
 
-// Copyright 2016 ego authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License"): you may
-// not use this file except in compliance with the License. You may obtain
-// a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS, WITHOUT
-// WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. See the
-// License for the specific language governing permissions and limitations
-// under the License.
+// Reference: https://en.wikipedia.org/wiki/MurmurHash
+// The following implementation is Murmur3_32bit for little-endian CPUs.
 
-// Package murmur Murmur3 hash function based on
-// http://en.wikipedia.org/wiki/MurmurHash
-
-import (
-	"reflect"
-	"unsafe"
-)
-
-const (
-	c1 = 0xcc9e2d51
-	c2 = 0x1b873593
-	c3 = 0x85ebca6b
-	c4 = 0xc2b2ae35
-	nh = 0xe6546b64
-)
-
-var (
-	// defaultSeed default murmur seed
-	defaultSeed = uint32(1)
-)
-
-// Murmur3 returns a hash from the provided key using the specified seed.
-func Murmur3(key []byte, seed ...uint32) uint32 {
-	return sum32(*(*string)((unsafe.Pointer)(
-		&reflect.StringHeader{
-			Len:  len(key),
-			Data: (*reflect.SliceHeader)(unsafe.Pointer(&key)).Data,
-		})),
-		seed...)
-
-	// return sum32(string(key), seed...)
+func murmurScramble(k uint32) uint32 {
+	k *= 0xcc9e2d51
+	k = (k << 15) | (k >> 17)
+	k *= 0x1b873593
+	return k
 }
 
-// sum32 returns a hash from the provided key using the seed.
-func sum32(key string, seed ...uint32) (hash uint32) {
-	hash = defaultSeed
-	if len(seed) > 0 {
-		hash = seed[0]
-	}
+// Murmur3 returns a hash from the provided key using the specified seed.
+func Murmur3(key []byte, seed uint32) (hash uint32) {
+	hash = seed
+	var k uint32
+	nbytes := uint32(len(key))
 
-	var nbytes = len(key) / 4 * 4
-	for i := 0; i < nbytes; i += 4 {
-		k := uint32(key[i]) | uint32(key[i+1])<<8 |
+	// Read in groups of 4.
+	for i, n := uint32(0), nbytes/4*4; i < n; i += 4 {
+		k = uint32(key[i]) | uint32(key[i+1])<<8 |
 			uint32(key[i+2])<<16 | uint32(key[i+3])<<24
 
-		k *= c1
-		k = (k << 15) | (k >> 17)
-		k *= c2
-		hash ^= k
-
+		hash ^= murmurScramble(k)
 		hash = (hash << 13) | (hash >> 19)
-		hash = hash*5 + nh
+		hash = hash*5 + 0xe6546b64
 	}
 
-	var remaining uint32
-	switch len(key) & 3 {
-	case 3:
-		remaining += uint32(key[nbytes+2]) << 16
-		fallthrough
-	case 2:
-		remaining += uint32(key[nbytes+1]) << 8
-		fallthrough
-	case 1:
-		remaining += uint32(key[nbytes])
-		remaining *= c1
-
-		remaining = (remaining << 15) | (remaining >> 17)
-		remaining = remaining * c2
-		hash ^= remaining
+	// Read the rest.
+	k = 0
+	for i := nbytes & 3; i > 0; i-- {
+		k <<= 8
+		k |= uint32(key[nbytes+i-4])
 	}
+	hash ^= murmurScramble(k)
 
-	hash ^= uint32(len(key))
+	// Finalize.
+	hash ^= nbytes
 	hash ^= hash >> 16
-	hash *= c3
+	hash *= 0x85ebca6b
 	hash ^= hash >> 13
-	hash *= c4
+	hash *= 0xc2b2ae35
 	hash ^= hash >> 16
-
 	return
 }
