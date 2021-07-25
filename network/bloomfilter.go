@@ -18,6 +18,7 @@ type BloomFilter struct {
 }
 
 // Add an item (bytes) to the filter.
+// It basically encodes it into the BitField.
 func (b *BloomFilter) Add(item []byte) {
 	bitfieldSize := b.Size * 8
 	for i := uint32(0); i < b.NumHashFuncs; i++ {
@@ -27,6 +28,7 @@ func (b *BloomFilter) Add(item []byte) {
 	}
 }
 
+// bytes returns a compact (squished) byte representation of the BitField.
 func (b *BloomFilter) bytes() ([]byte, error) {
 	if len(b.BitField)%8 != 0 {
 		return nil, errors.New("BitField must have length divisible by 8")

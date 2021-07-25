@@ -3,8 +3,6 @@ package network
 import (
 	"bytes"
 	"encoding/binary"
-	"encoding/hex"
-	"errors"
 	"io"
 	"math/big"
 	"net"
@@ -26,7 +24,7 @@ type NetAddr struct {
 	Time     uint32 // The Time (version >= 31402). Not present in version message.
 	Services uint64 // Same service(s) listed in version.
 	IP       net.IP // IPv6 address or IPv4 address.
-	Port     uint16 // Port numbet.
+	Port     uint16 // Port number.
 }
 
 func (na *NetAddr) marshal() (ret [30]byte) {
@@ -43,12 +41,16 @@ func (na *NetAddr) marshalVersion() (ret [26]byte) {
 	return
 }
 
+// message interface represents the bitcoin's protocol network message
 type message interface {
-	command() string
+	command() string // A constant. Describes the message type.
 	marshal() ([]byte, error)
 	unmarshal(r io.Reader) message
 }
 
+// When a node creates an outgoing connection, it will immediately advertise its version.
+// The remote node will respond with its version. No further communication is possible until
+// both peers have exchanged their version.
 type VersionMsg struct {
 	Version   int32   // Identifies protocol version being used by the node.
 	Services  uint64  // Bitfield of features to be enabled for this connection.
@@ -104,6 +106,7 @@ func (vm *VersionMsg) unmarshal(r io.Reader) message {
 	return vm
 }
 
+// The verack message is sent in reply to version.
 type VerackMsg struct{}
 
 func (va *VerackMsg) command() string {
@@ -118,11 +121,13 @@ func (va *VerackMsg) unmarshal(r io.Reader) message {
 	return va
 }
 
+// Return a headers packet containing the headers of blocks starting right after the last known
+// hash in the block locator object, up to EndBlock or 2000 blocks, whichever comes first.
 type GetHeadersMsg struct {
-	Version    int32  // The protocol version.
-	NumHashes  int32  // VarInt. Number of block locator hash entries; can be >1 upon chain split.
-	StartBlock string // Block locator object. [32]byte
-	EndBlock   string // Hash of last desired block; set to zero for as many blocks as possible.
+	Version    int32    // The protocol version.
+	NumHashes  int32    // VarInt. Number of block locator hash entries; can be >1 upon chain split.
+	StartBlock [32]byte // Block locator object.
+	EndBlock   [32]byte // Hash of last desired block; set to zero for as many blocks as possible.
 }
 
 func (gh *GetHeadersMsg) command() string {
@@ -138,22 +143,8 @@ func (gh *GetHeadersMsg) marshal() ([]byte, error) {
 	}
 	buf.Write(b)
 
-	if len(gh.StartBlock) != 64 {
-		return nil, errors.New("StartBlock must be of len 64 (256 bits)")
-	}
-	b, err = hex.DecodeString(gh.StartBlock)
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(utils.Reversed(b))
-	if len(gh.EndBlock) != 64 {
-		return nil, errors.New("EndBlock must be of len 64 (256 bits)")
-	}
-	b, err = hex.DecodeString(gh.EndBlock)
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(utils.Reversed(b))
+	buf.Write(utils.Reversed(gh.StartBlock[:]))
+	buf.Write(utils.Reversed(gh.EndBlock[:]))
 
 	return buf.Bytes(), nil
 }
@@ -163,8 +154,9 @@ func (gh *GetHeadersMsg) unmarshal(r io.Reader) message {
 	return gh
 }
 
+// The headers packet returns block headers in response to a getheaders packet.
 type HeadersMsg struct {
-	Headers []*blockchain.Block
+	Headers []blockchain.Block
 }
 
 func (hm *HeadersMsg) command() string {
@@ -178,7 +170,7 @@ func (hm *HeadersMsg) marshal() ([]byte, error) {
 func (hm *HeadersMsg) unmarshal(r io.Reader) message {
 	count := encoding.DecodeVarInt(r)
 	for i := 0; i < int(count.Int64()); i++ {
-		hm.Headers = append(hm.Headers, new(blockchain.Block).Unmarshal(r))
+		hm.Headers = append(hm.Headers, *new(blockchain.Block).Unmarshal(r))
 		// The number of transactions is also given and is always zero if we
 		// only request the headers. This is done so that the same code can be
 		// used to decode the "block" message, which contains the full block
@@ -192,6 +184,9 @@ func (hm *HeadersMsg) unmarshal(r io.Reader) message {
 	return hm
 }
 
+// The ping message is sent primarily to confirm that the TCP/IP connection is still valid.
+// An error in transmission is presumed to be a closed connection and the address is removed
+// as a current peer.
 type PingMsg struct {
 	Nonce uint64 // Random nonce.
 }
@@ -207,10 +202,12 @@ func (p *PingMsg) marshal() ([]byte, error) {
 }
 
 func (p *PingMsg) unmarshal(r io.Reader) message {
-	binary.Read(r, binary.BigEndian, &(p.Nonce))
+	binary.Read(r, binary.BigEndian, &p.Nonce)
 	return p
 }
 
+// The pong message is sent in response to a ping message.
+// A pong response is generated using a nonce included in the ping.
 type PongMsg struct {
 	Nonce uint64 // Nonce from Ping.
 }
@@ -226,10 +223,12 @@ func (p *PongMsg) marshal() ([]byte, error) {
 }
 
 func (p *PongMsg) unmarshal(r io.Reader) message {
-	binary.Read(r, binary.BigEndian, &(p.Nonce))
+	binary.Read(r, binary.BigEndian, &p.Nonce)
 	return p
 }
 
+// Upon receiving a filterload command, the remote peer will immediately restrict the
+// broadcast transactions it announces (in inv packets) to transactions matching the filter.
 type FilterloadMsg struct {
 	BloomFilter
 	Flags uint8 // A set of flags that control how matched items are added to the filter.
@@ -281,10 +280,13 @@ func (iv *InventoryVector) marshal() (ret [36]byte) {
 	return
 }
 
+// Packet getdata is used to retrieve the content of a specific object, and is
+// usually sent after receiving an inv packet, after filtering known elements.
 type GetDataMsg struct {
 	Inventory []InventoryVector
 }
 
+// Add a new object to the Inventory.
 func (gd *GetDataMsg) Add(v InventoryVector) {
 	gd.Inventory = append(gd.Inventory, v)
 }

@@ -7,14 +7,16 @@ import (
 	"net"
 
 	"github.com/VIVelev/btcd/blockchain"
+	"github.com/VIVelev/btcd/crypto/hash"
 	"github.com/VIVelev/btcd/network"
+	"github.com/VIVelev/btcd/utils"
 )
 
 // partialValidation validates the block headers of the first 40,000 blocks
 func partialValidation() {
 	// Start with the genesis block
 	// https://en.bitcoin.it/wiki/Genesis_block
-	previous := new(blockchain.Block).Unmarshal(bytes.NewReader(blockchain.MainGenesisBlockBytes))
+	previous := *new(blockchain.Block).Unmarshal(bytes.NewReader(blockchain.MainGenesisBlockBytes))
 
 	// Now let's crawl the blockchain block headers
 	conn, err := net.Dial("tcp", "mainnet.programmingbitcoin.com:8333")
@@ -30,14 +32,17 @@ func partialValidation() {
 		panic(err)
 	}
 
-	blocks := []*blockchain.Block{previous}
+	blocks := []blockchain.Block{previous}
 	for i := 0; i < 20; i++ {
 		// request the next batch of 2,000 headers
+		b := previous.Marshal()
+		h := hash.Hash256(b[:])
+		copy(h[:], utils.Reversed(h[:]))
 		getheaders := network.GetHeadersMsg{
 			Version:    70015,
 			NumHashes:  1,
-			StartBlock: previous.Id(),
-			EndBlock:   "0000000000000000000000000000000000000000000000000000000000000000",
+			StartBlock: h,
+			EndBlock:   [32]byte{},
 		}
 		node.Write(&getheaders)
 		msg, err := node.WaitFor("headers")
