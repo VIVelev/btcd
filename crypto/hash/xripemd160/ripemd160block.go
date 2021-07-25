@@ -8,9 +8,7 @@ package xripemd160
 // In its own file so that a faster assembly or C version
 // can be substituted easily.
 
-import (
-	"math/bits"
-)
+import "math/bits"
 
 // work buffer indices and roll amounts for one line
 var _n = [80]uint{

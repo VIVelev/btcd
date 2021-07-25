@@ -8,9 +8,7 @@ package xripemd160
 // Preneel with specifications available at:
 // http://homes.esat.kuleuven.be/~cosicart/pdf/AB-9601/AB-9601.pdf.
 
-import (
-	"hash"
-)
+import "hash"
 
 // The size of the checksum in bytes.
 const Size = 20
