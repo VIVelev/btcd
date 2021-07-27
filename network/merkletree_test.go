@@ -65,3 +65,33 @@ func TestPopulate1(t *testing.T) {
 		t.Errorf("FAIL")
 	}
 }
+
+func TestPopulate2(t *testing.T) {
+	hexHashes := [5]string{
+		"42f6f52f17620653dcc909e58bb352e0bd4bd1381e2955d19c00959a22122b2e",
+		"94c3af34b9667bf787e1c6a0a009201589755d01d02fe2877cc69b929d2418d4",
+		"959428d7c48113cb9149d0566bde3d46e98cf028053c522b8fa8f735241aa953",
+		"a9f27b99d5d108dede755710d4a1ffa2c74af70b4ca71726fa57d68454e609a2",
+		"62af110031e29de1efcad103b3ad4bec7bdcf6cb9c9f4afdd586981795516577",
+	}
+
+	tree := newMerkleTree(5)
+	var hashes [5][32]byte
+	for i := range hashes {
+		h, _ := hex.DecodeString(hexHashes[i])
+		copy(hashes[i][:], h)
+	}
+	var flagBits [11]byte
+	for i := range flagBits {
+		flagBits[i] = 1
+	}
+	err := tree.populate(flagBits[:], hashes[:])
+	if err != nil {
+		t.Error(err)
+	}
+	root, _ := hex.DecodeString("a8e8bd023169b81bc56854137a135b97ef47a6a7237f4c6e037baed16285a5ab")
+	b := tree.root().hash
+	if !bytes.Equal(b[:], root) {
+		t.Errorf("FAIL")
+	}
+}
