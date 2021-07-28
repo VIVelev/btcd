@@ -316,3 +316,43 @@ func (gd *GetDataMsg) unmarshal(r io.Reader) message {
 	// TODO
 	return gd
 }
+
+// After a filter has been set, nodes don't merely stop announcing non-matching transactions,
+// they can also serve filtered blocks.
+type MerkleblockMsg struct {
+	blockchain.Block
+	TotalTxs uint32     // Number of transactions in the block (including unmatched ones).
+	Hashes   [][32]byte // Hashes in depth-first order.
+	Flags    []byte     // Flag bits, packed per 8 in a byte, least significant bit first.
+}
+
+func (mb *MerkleblockMsg) command() string {
+	return "merkleblock"
+}
+
+func (mb *MerkleblockMsg) marshal() ([]byte, error) {
+	// TODO
+	return []byte{0}, nil
+}
+
+func (mb *MerkleblockMsg) unmarshal(r io.Reader) message {
+	mb.Block.Unmarshal(r)
+	// TotalTxs, 4 bytes, little-endian
+	binary.Read(r, binary.LittleEndian, &mb.TotalTxs)
+	// numHashes, VarInt
+	numHashes := encoding.DecodeVarInt(r).Uint64()
+	// Hashes
+	mb.Hashes = make([][32]byte, numHashes)
+	for i := range mb.Hashes {
+		// Hash, 32 bytes, little-endian
+		io.ReadFull(r, mb.Hashes[i][:])
+		copy(mb.Hashes[i][:], utils.Reversed(mb.Hashes[i][:]))
+	}
+	// lengthFlags, VarInt
+	lengthFlags := encoding.DecodeVarInt(r).Uint64()
+	// Flags
+	mb.Flags = make([]byte, lengthFlags)
+	io.ReadFull(r, mb.Flags)
+
+	return mb
+}

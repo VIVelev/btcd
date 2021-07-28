@@ -17,12 +17,12 @@ var (
 
 // Block represents a Bitcoin block header, the metadata of a block.
 type Block struct {
-	Version        uint32
-	HashPrevBlock  [32]byte
-	HashMerkleRoot [32]byte
-	Timestamp      uint32
-	Bits           [4]byte
-	Nonce          [4]byte
+	Version        uint32   // Block version, based on the software version creating this block.
+	HashPrevBlock  [32]byte // The hash value of the previous block this particular block references.
+	HashMerkleRoot [32]byte // Merkle tree hash of all transactions related to this block.
+	Timestamp      uint32   // A timestamp recording when this block was created (limited to 2106).
+	Bits           [4]byte  // The calculated difficulty target being used for this block.
+	Nonce          [4]byte  // The nonce used to generate this block.
 }
 
 func (b *Block) Marshal() [80]byte {
