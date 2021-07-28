@@ -55,7 +55,7 @@ func TestPopulate1(t *testing.T) {
 	for i := range flagBits {
 		flagBits[i] = 1
 	}
-	err := tree.populate(flagBits[:], hashes[:])
+	err := tree.populate(hashes[:], flagBits[:])
 	if err != nil {
 		t.Error(err)
 	}
@@ -85,7 +85,7 @@ func TestPopulate2(t *testing.T) {
 	for i := range flagBits {
 		flagBits[i] = 1
 	}
-	err := tree.populate(flagBits[:], hashes[:])
+	err := tree.populate(hashes[:], flagBits[:])
 	if err != nil {
 		t.Error(err)
 	}

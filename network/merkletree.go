@@ -98,31 +98,37 @@ func (t *merkleTree) isLeaf(n merkleNode) bool {
 // 3. If the node is a leaf node and is a transaction of interest, the flag is 1 and
 // the node’s value is also given in the hashes field. These are the items proven to
 // be included in the Merkle tree.
-func (t *merkleTree) populate(flagBits []byte, hashes [][32]byte) error {
+func (t *merkleTree) populate(hashes [][32]byte, flagBits []byte) error {
 	node := merkleNode{} // this node is used to traverse (DFS) the tree
-	for {
-		// consume a flag
-		f := flagBits[0]
-		flagBits = flagBits[1:]
-	BACKTRACK: // backtracking must skip flag bit consumption
-		if r := t.root(); !r.isEmpty() {
-			break
-		}
-
-		if f == 0 || (f == 1 && t.isLeaf(node)) {
+	for r := t.root(); r.isEmpty(); r = t.root() {
+		if t.isLeaf(node) {
+			// consume a flag
+			flagBits = flagBits[1:]
 			// we have the hash in hashes
 			node.hash = hashes[0]
 			hashes = hashes[1:]
 			// set the node
 			t.setNode(node)
-			// move to the parent (backtrack)
+			// move to the parent
 			node.up()
-			goto BACKTRACK
 		} else {
 			// peek left child
 			leftChild := t.getLeftOf(node)
 			if leftChild.isEmpty() {
-				node.left()
+				// consume a flag
+				f := flagBits[0]
+				flagBits = flagBits[1:]
+				if f == 0 {
+					// we have the hash in hashes
+					node.hash = hashes[0]
+					hashes = hashes[1:]
+					// set the node
+					t.setNode(node)
+					// move to the parent
+					node.up()
+				} else {
+					node.left()
+				}
 			} else {
 				if t.hasRightOf(node) {
 					// peek right child
@@ -133,23 +139,24 @@ func (t *merkleTree) populate(flagBits []byte, hashes [][32]byte) error {
 						// make merkle parent of left and right; backtrack
 						t.setNode(merkleParent(leftChild, rightChild))
 						node.up()
-						goto BACKTRACK
 					}
 				} else {
 					// make merkle parent of two left; backtrack
 					t.setNode(merkleParent(leftChild, leftChild))
 					node.up()
-					goto BACKTRACK
 				}
 			}
 		}
 	}
 
-	if len(flagBits) != 0 {
-		return errors.New("flagBits not all consumed")
-	}
 	if len(hashes) != 0 {
 		return errors.New("hashes not all consumed")
+	}
+	// Extra 0 bits are padded on to reach full byte size.
+	for _, bit := range flagBits {
+		if bit != 0 {
+			return errors.New("flagBits not all consumed")
+		}
 	}
 	return nil
 }

@@ -73,7 +73,7 @@ func partialValidation() {
 			b, _ := hex.DecodeString(blocks[i-1].Id())
 			copy(expectedPrevBlock[:], b)
 		}
-		if !bytes.Equal(block.HashPrevBlock[:], expectedPrevBlock[:]) {
+		if !bytes.Equal(block.PrevBlock[:], expectedPrevBlock[:]) {
 			panic("Ptr to prev block not valid")
 		}
 

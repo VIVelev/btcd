@@ -323,7 +323,30 @@ type MerkleblockMsg struct {
 	blockchain.Block
 	TotalTxs uint32     // Number of transactions in the block (including unmatched ones).
 	Hashes   [][32]byte // Hashes in depth-first order.
-	Flags    []byte     // Flag bits, packed per 8 in a byte, least significant bit first.
+	Flags    []byte     // Flag bits, packed per 8 in a byte, little-endian. Padded with 0.
+}
+
+// IsValid verifies whether the merkle tree information validates to the merkle root.
+func (mb *MerkleblockMsg) IsValid() (bool, error) {
+	// convert the Hashes to little-endian for the merkle root calculation
+	hashes := make([][32]byte, len(mb.Hashes))
+	for i := range hashes {
+		copy(hashes[i][:], utils.Reversed(mb.Hashes[i][:]))
+	}
+	// convert the Flags to bit field
+	flagBits := bytesToBitField(mb.Flags)
+	// init an empty merkle tree
+	tree := newMerkleTree(int(mb.TotalTxs))
+	// populate the tree
+	err := tree.populate(hashes, flagBits)
+	if err != nil {
+		return false, err
+	}
+	// convert the root to little-endian
+	root := tree.root().hash
+	copy(root[:], utils.Reversed(root[:]))
+	// check
+	return bytes.Equal(root[:], mb.MerkleRoot[:]), nil
 }
 
 func (mb *MerkleblockMsg) command() string {

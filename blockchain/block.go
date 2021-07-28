@@ -17,12 +17,12 @@ var (
 
 // Block represents a Bitcoin block header, the metadata of a block.
 type Block struct {
-	Version        uint32   // Block version, based on the software version creating this block.
-	HashPrevBlock  [32]byte // The hash value of the previous block this particular block references.
-	HashMerkleRoot [32]byte // Merkle tree hash of all transactions related to this block.
-	Timestamp      uint32   // A timestamp recording when this block was created (limited to 2106).
-	Bits           [4]byte  // The calculated difficulty target being used for this block.
-	Nonce          [4]byte  // The nonce used to generate this block.
+	Version    uint32   // Block version, based on the software version creating this block.
+	PrevBlock  [32]byte // The hash value of the previous block this particular block references.
+	MerkleRoot [32]byte // Merkle tree hash of all transactions related to this block.
+	Timestamp  uint32   // A timestamp recording when this block was created (limited to 2106).
+	Bits       [4]byte  // The calculated difficulty target being used for this block.
+	Nonce      [4]byte  // The nonce used to generate this block.
 }
 
 func (b *Block) Marshal() [80]byte {
@@ -30,9 +30,9 @@ func (b *Block) Marshal() [80]byte {
 	// Version, 4 bytes, little-endian
 	binary.LittleEndian.PutUint32(ret[:4], b.Version)
 	// HashPrevBlock, 32 bytes, little-endian
-	copy(ret[4:36], utils.Reversed(b.HashPrevBlock[:]))
+	copy(ret[4:36], utils.Reversed(b.PrevBlock[:]))
 	// HashMerkleRoot, 32 bytes, little-endian
-	copy(ret[36:68], utils.Reversed(b.HashMerkleRoot[:]))
+	copy(ret[36:68], utils.Reversed(b.MerkleRoot[:]))
 	// Timestamp, 4 bytes, little-endian
 	binary.LittleEndian.PutUint32(ret[68:72], b.Timestamp)
 	// Bits, 4 bytes
@@ -49,10 +49,10 @@ func (b *Block) Unmarshal(r io.Reader) *Block {
 	// HashPrevBlock, 32 bytes, little-endian
 	var le [32]byte
 	io.ReadFull(r, le[:])
-	copy(b.HashPrevBlock[:], utils.Reversed(le[:]))
+	copy(b.PrevBlock[:], utils.Reversed(le[:]))
 	// HashMerkleRoot, 32 bytes, little-endian
 	io.ReadFull(r, le[:])
-	copy(b.HashMerkleRoot[:], utils.Reversed(le[:]))
+	copy(b.MerkleRoot[:], utils.Reversed(le[:]))
 	// Timestamp, 4 bytes, little-endian
 	binary.Read(r, binary.LittleEndian, &b.Timestamp)
 	// Bits, 4 bytes

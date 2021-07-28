@@ -33,11 +33,11 @@ func TestUnmarshal(t *testing.T) {
 	}
 
 	want, _ := hex.DecodeString("000000000000000000fd0c220a0a8c3bc5a7b487e8c8de0dfa2373b12894c38e")
-	if !bytes.Equal(block.HashPrevBlock[:], want) {
+	if !bytes.Equal(block.PrevBlock[:], want) {
 		t.Errorf("FAIL")
 	}
 	want, _ = hex.DecodeString("be258bfd38db61f957315c3f9e9c5e15216857398d50402d5089a8e0fc50075b")
-	if !bytes.Equal(block.HashMerkleRoot[:], want) {
+	if !bytes.Equal(block.MerkleRoot[:], want) {
 		t.Errorf("FAIL")
 	}
 
