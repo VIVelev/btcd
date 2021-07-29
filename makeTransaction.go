@@ -38,7 +38,7 @@ func makeTransaction() tx.Tx {
 	bytes, _ := hex.DecodeString(prevTxId)
 	copy(txIn.PrevTxId[:], bytes)
 	txIn.PrevIndex = uint32(prevIndex)
-	txIn.Testnet = true
+	txIn.TestNet = true
 
 	// Decide how much coins to send.
 
@@ -75,8 +75,8 @@ func makeTransaction() tx.Tx {
 		Version:  1,
 		TxIns:    []tx.TxIn{txIn},
 		TxOuts:   []tx.TxOut{targetTxOut, changeTxOut},
-		Locktime: 0,
-		Testnet:  true,
+		LockTime: 0,
+		TestNet:  true,
 	}
 	// And sign the inputs please. In this way you verify that the money
 	// you are about to spend are, indeed, yours.

@@ -32,7 +32,7 @@ func Fetch(txId string, testnet, fresh bool) (Tx, error) {
 		}
 		defer resp.Body.Close()
 		tx = Tx{}
-		tx.Testnet = testnet
+		tx.TestNet = testnet
 		tx.Unmarshal(hex.NewDecoder(resp.Body))
 		id, err := tx.Id()
 		if err != nil {

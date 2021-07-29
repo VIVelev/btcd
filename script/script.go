@@ -26,6 +26,23 @@ func NewP2PKHScript(h160 [20]byte) Script {
 	}
 }
 
+// IsP2PKH returns whether this follows the:
+//     `OP_DUP OP_HASH160 <20 byte hash> OP_EQUALVERIFY OP_CHECKSIG` pattern
+func (s *Script) IsP2PKH() bool {
+	cmds := *s
+	return len(cmds) == 5 && cmds[0] == OP_DUP && cmds[1] == OP_HASH160 &&
+		len(cmds[2].(element)) == 20 && cmds[3] == OP_EQUALVERIFY &&
+		cmds[4] == OP_CHECKSIG
+}
+
+// IsP2WPKH returns whether this follows the:
+//     `OP_0 <20 byte hash>` pattern
+func (s *Script) IsP2WPKH() bool {
+	cmds := *s
+	return len(cmds) == 2 && cmds[0] == OP_0 &&
+		len(cmds[1].(element)) == 20
+}
+
 func (s *Script) Add(cmds ...command) Script {
 	return append(*s, cmds...)
 }
@@ -36,6 +53,13 @@ func (s *Script) AddBytes(b ...[]byte) Script {
 		els[i] = element(b[i])
 	}
 	return s.Add(els...)
+}
+
+func (s *Script) GetBytes(index int) []byte {
+	el := (*s)[index].(element)
+	buf := make([]byte, len(el))
+	copy(buf, el)
+	return buf
 }
 
 func (s *Script) copy() Script {
