@@ -26,6 +26,14 @@ func NewP2PKHScript(h160 [20]byte) Script {
 	}
 }
 
+// NewP2WPKHScript returns a Pay-to-Witness-PubkeyHash Script
+func NewP2WPKHScript(h160 [20]byte) Script {
+	return []command{
+		OP_0,
+		element(h160[:]),
+	}
+}
+
 // IsP2PKH returns whether this follows the:
 //     `OP_DUP OP_HASH160 <20 byte hash> OP_EQUALVERIFY OP_CHECKSIG` pattern
 func (s *Script) IsP2PKH() bool {
@@ -78,12 +86,10 @@ func (s *Script) Marshal() ([]byte, error) {
 			if length <= 75 {
 				binary.Write(buf, binary.LittleEndian, opcode(length))
 			} else if 76 <= length && length <= 0xff {
-				// 76 is OP_PUSHDATA1
-				binary.Write(buf, binary.LittleEndian, opcode(76))
+				binary.Write(buf, binary.LittleEndian, OP_PUSHDATA1)
 				binary.Write(buf, binary.LittleEndian, uint8(length))
 			} else if 0x100 <= length && length <= 520 {
-				// 77 is OP_PUSHDATA2
-				binary.Write(buf, binary.LittleEndian, opcode(77))
+				binary.Write(buf, binary.LittleEndian, OP_PUSHDATA2)
 				binary.Write(buf, binary.LittleEndian, uint16(length))
 			} else {
 				return nil, errors.New("Script.Marshal: the command is too long")
@@ -123,13 +129,13 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 		if 1 <= current && current <= 75 {
 			// elements of size [1, 75] bytes
 			*s = append(*s, readElement(int(current)))
-		} else if current == 76 {
+		} else if current == OP_PUSHDATA1 {
 			// OP_PUSHDATA1: elements of size [76, 255] bytes
 			var elementLength uint8
 			binary.Read(r, binary.LittleEndian, &elementLength)
 			count += 1
 			*s = append(*s, readElement(int(elementLength)))
-		} else if current == 77 {
+		} else if current == OP_PUSHDATA2 {
 			// OP_PUSHDATA2: elements of size [256, 520] bytes
 			var elementLength uint16
 			binary.Read(r, binary.LittleEndian, &elementLength)
