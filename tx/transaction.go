@@ -19,7 +19,7 @@ import (
 
 const (
 	// Sighash Types
-	SighashAll = uint32(iota)
+	SighashAll = uint32(iota + 1)
 	SighashNone
 	SighashSingle
 )
@@ -42,10 +42,14 @@ type Tx struct {
 }
 
 func (t *Tx) Id() (string, error) {
+	// switch to legacy for marshalling
+	tmp := t.SegWit
+	t.SegWit = false
 	b, err := t.Marshal()
 	if err != nil {
 		return "", err
 	}
+	t.SegWit = tmp
 	b32 := hash.Hash256(b)
 	return hex.EncodeToString(utils.Reversed(b32[:])), nil
 }
@@ -70,62 +74,45 @@ func (t *Tx) Fee() (int, error) {
 	return int(inputSum - outputSum), nil
 }
 
-func (t *Tx) marshalLegacy(sigIndex int) ([]byte, error) {
+// SighashLegacy returns the message that needs to get signed for the input with the index.
+func (t *Tx) SighashLegacy(index int) ([32]byte, error) {
 	buf := new(bytes.Buffer)
-	// marshal Version, 4 bytes, little-endian
+	// Version, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, t.Version)
-	// EncodeVarInt on the number of inputs
+	// Number of Inputs, VarInt
 	b, err := encoding.EncodeVarInt(big.NewInt(int64(len(t.TxIns))))
 	if err != nil {
-		return nil, err
+		return [32]byte{}, err
 	}
 	buf.Write(b)
-	// marshal TxIns
-	if sigIndex == -1 {
-		for _, in := range t.TxIns {
-			b, err = in.Marshal()
-			if err != nil {
-				return nil, err
-			}
-			buf.Write(b)
-		}
-	} else {
-		for i, in := range t.TxIns {
-			b, err = in.marshalScriptOverride(i == sigIndex)
-			if err != nil {
-				return nil, err
-			}
-			buf.Write(b)
-		}
-	}
-	// EncodeVarInt on the number of outputs
-	b, err = encoding.EncodeVarInt(big.NewInt(int64(len(t.TxOuts))))
-	if err != nil {
-		return nil, err
-	}
-	buf.Write(b)
-	// marshal TxOuts
-	for _, out := range t.TxOuts {
-		b, err = out.Marshal()
+	// TxIns, overrided
+	for i, in := range t.TxIns {
+		b, err = in.marshalScriptOverride(i == index)
 		if err != nil {
-			return nil, err
+			return [32]byte{}, err
 		}
 		buf.Write(b)
 	}
-	// marshal Locktime, 4 bytes, little-endian
-	binary.Write(buf, binary.LittleEndian, t.LockTime)
-	// marshal SighashAll, 4 bytes, little-endian, if sigIndex != -1
-	if sigIndex != -1 {
-		binary.Write(buf, binary.LittleEndian, SighashAll)
+	// Number of Outputs, VarInt
+	b, err = encoding.EncodeVarInt(big.NewInt(int64(len(t.TxOuts))))
+	if err != nil {
+		return [32]byte{}, err
 	}
-	// return bytes
-	return buf.Bytes(), nil
-}
-
-// SighashLegacy returns the message that needs to get signed for the input with the index.
-func (t *Tx) SighashLegacy(index int) ([32]byte, error) {
-	b, err := t.marshalLegacy(index)
-	return hash.Hash256(b), err
+	buf.Write(b)
+	// TxOuts
+	for _, out := range t.TxOuts {
+		b, err = out.Marshal()
+		if err != nil {
+			return [32]byte{}, err
+		}
+		buf.Write(b)
+	}
+	// LockTime, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, t.LockTime)
+	// Sighash type, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, SighashAll)
+	// Hash256
+	return hash.Hash256(buf.Bytes()), err
 }
 
 // hashPrevouts returns Hash256(<txIn.PrevTxId> + <txIn.PrevIndex> for all inputs)
@@ -269,10 +256,10 @@ func (t *Tx) VerifyInput(index int) (bool, error) {
 		return false, err
 	}
 	var sighash [32]byte
-	if spk.IsP2PKH() {
-		sighash, err = t.SighashLegacy(index)
-	} else if spk.IsP2WPKH() {
+	if spk.IsP2WPKH() {
 		sighash, err = t.SighashBip143(index, nil, 0)
+	} else if spk.IsP2PKH() {
+		sighash, err = t.SighashLegacy(index)
 	} else {
 		return false, errors.New("unknown script type")
 	}
@@ -280,7 +267,7 @@ func (t *Tx) VerifyInput(index int) (bool, error) {
 		return false, err
 	}
 	combinedScript := in.ScriptSig.Add(spk...)
-	return combinedScript.Eval(sighash[:]), nil
+	return combinedScript.Eval(sighash[:], in.Witness), nil
 }
 
 // Verify returns whether this transaction is valid
@@ -321,8 +308,8 @@ func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) (bool, error) {
 	}
 	// get DER signature
 	der := priv.Sign(sighash[:]).Marshal()
-	// append the SIGHASH_ALL (1) to der
-	sig := append(der, 0x01)
+	// append the Sighash type to der
+	sig := append(der, byte(SighashAll))
 	// calculate SEC pubkey
 	sec := priv.PublicKey.MarshalCompressed()
 	// initialize a new ScriptSig
@@ -333,8 +320,76 @@ func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) (bool, error) {
 	return t.VerifyInput(index)
 }
 
+// Marshal converts Tx t to []byte.
+//
+// Legacy format:
+//     [Version][NumIns][TxIns][NumOuts][TxOuts][LockTime]
+// SegWit format:
+//	   [Version][Marker][Flag][NumIns][TxIns][NumOuts][TxOuts][Witness][LockTime]
 func (t *Tx) Marshal() ([]byte, error) {
-	return t.marshalLegacy(-1)
+	buf := new(bytes.Buffer)
+
+	// Version, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, t.Version)
+
+	if t.SegWit {
+		// Marker & Flag, 2 bytes
+		buf.WriteByte(0x00)
+		buf.WriteByte(0x01)
+	}
+
+	// Number of Inputs, VarInt
+	b, err := encoding.EncodeVarInt(big.NewInt(int64(len(t.TxIns))))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// TxIns
+	for _, in := range t.TxIns {
+		b, err = in.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+	// Number of Outputs, VarInt
+	b, err = encoding.EncodeVarInt(big.NewInt(int64(len(t.TxOuts))))
+	if err != nil {
+		return nil, err
+	}
+	buf.Write(b)
+	// TxOuts
+	for _, out := range t.TxOuts {
+		b, err = out.Marshal()
+		if err != nil {
+			return nil, err
+		}
+		buf.Write(b)
+	}
+
+	if t.SegWit {
+		// Witness
+		for _, txIn := range t.TxIns {
+			binary.Write(buf, binary.LittleEndian, byte(len(txIn.Witness)))
+			for _, item := range txIn.Witness {
+				if len(item) == 1 && item[0] == 0 {
+					binary.Write(buf, binary.LittleEndian, item[0])
+				} else {
+					num, err := encoding.EncodeVarInt(big.NewInt(int64(len(item))))
+					if err != nil {
+						return nil, err
+					}
+					buf.Write(num)
+					buf.Write(item)
+				}
+			}
+		}
+	}
+
+	// LockTime, 4 bytes, little-endian
+	binary.Write(buf, binary.LittleEndian, t.LockTime)
+
+	return buf.Bytes(), nil
 }
 
 // Unmarshal parses a Tx from the Reader r.
@@ -419,27 +474,27 @@ type TxIn struct {
 
 func (in *TxIn) marshal(n int) ([]byte, error) {
 	buf := new(bytes.Buffer)
-	// marshal PrevTxId, 32 bytes, little-endian
+	// PrevTxId, 32 bytes, little-endian
 	buf.Write(utils.Reversed(append([]byte{}, in.PrevTxId[:]...)))
-	// marshal PrevIndex, 4 bytes, little-endian
+	// PrevIndex, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.PrevIndex)
 	var b []byte
 	var err error
 	switch n {
 	case -1:
-		// marshal ScriptSig
+		// ScriptSig
 		b, err = in.ScriptSig.Marshal()
 		if err != nil {
 			return nil, err
 		}
 	case 0:
-		// marshal empty Script
+		// empty Script
 		b, err = new(script.Script).Marshal()
 		if err != nil {
 			return nil, err
 		}
 	case 1:
-		// marshal ScriptPubKey instead of ScriptSig
+		// ScriptPubKey instead of ScriptSig
 		spk, err := in.ScriptPubKey()
 		if err != nil {
 			return nil, err
@@ -450,7 +505,7 @@ func (in *TxIn) marshal(n int) ([]byte, error) {
 		}
 	}
 	buf.Write(b)
-	// marshal Sequence, 4 bytes, little-endian
+	// Sequence, 4 bytes, little-endian
 	binary.Write(buf, binary.LittleEndian, in.Sequence)
 	// return bytes
 	return buf.Bytes(), nil

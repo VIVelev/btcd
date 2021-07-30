@@ -63,6 +63,11 @@ func decodeNum(b element) (n int) {
 	return
 }
 
+func op0(st, _ *stack, _ Script, _ []byte) bool {
+	st.Push(OP_0)
+	return true
+}
+
 func opDup(st, _ *stack, _ Script, _ []byte) bool {
 	if len(*st) < 1 {
 		return false
@@ -264,7 +269,7 @@ const (
 )
 
 var OpcodeFunctions = map[opcode]operation{
-	// 0: op0,
+	OP_0: op0,
 	// 76: opPushdata1,
 	// 77: opPushdata2,
 	// 78: opPushdata4,

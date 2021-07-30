@@ -144,7 +144,7 @@ func (s *Script) Unmarshal(r io.Reader) *Script {
 	return s
 }
 
-func (s *Script) Eval(sighash []byte) bool {
+func (s *Script) Eval(sighash []byte, witness [][]byte) bool {
 	stack, altstack, cmds := new(stack), new(stack), s.copy()
 
 	for len(cmds) > 0 {
@@ -157,6 +157,17 @@ func (s *Script) Eval(sighash []byte) bool {
 			}
 		case element:
 			stack.Push(cmd)
+
+			// witness program version 0 rule
+			// if stack cmds are: OP_0 <20 byte hash> this is p2wpkh
+			if len(*stack) == 2 && (*stack)[0] == OP_0 && len((*stack)[1].(element)) == 20 {
+				_, c := stack.Pop()
+				var h160 [20]byte
+				copy(h160[:], c.(element))
+				stack.Pop() // pop the OP_0
+				cmds = cmds.AddBytes(witness...)
+				cmds = cmds.Add(NewP2PKHScript(h160)...)
+			}
 		}
 	}
 

@@ -219,6 +219,20 @@ func TestVerifyP2PKH(t *testing.T) {
 	}
 }
 
+func TestVerifyP2WPKH(t *testing.T) {
+	newTx, err := Fetch(
+		"d869f854e1f8788bcff294cc83b280942a8c728de71eb709a2c29d10bfe21b7c",
+		true,
+		false,
+	)
+	if err != nil {
+		t.Error(err)
+	}
+	if ok, _ := newTx.Verify(); !ok {
+		t.Errorf("FAIL")
+	}
+}
+
 func TestSignInput(t *testing.T) {
 	priv := ecdsa.GenerateKeyFromSecret(elliptic.Secp256k1, new(big.Int).SetUint64(8675309))
 
