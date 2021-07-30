@@ -46,10 +46,10 @@ func (t *Tx) Id() (string, error) {
 	tmp := t.SegWit
 	t.SegWit = false
 	b, err := t.Marshal()
+	t.SegWit = tmp
 	if err != nil {
 		return "", err
 	}
-	t.SegWit = tmp
 	b32 := hash.Hash256(b)
 	return hex.EncodeToString(utils.Reversed(b32[:])), nil
 }
@@ -68,10 +68,8 @@ func (t *Tx) Fee() (int, error) {
 		outputSum += out.Amount
 	}
 
-	if outputSum > inputSum {
-		return -int(outputSum - inputSum), nil
-	}
-	return int(inputSum - outputSum), nil
+	a, b := int(inputSum), int(outputSum)
+	return a - b, nil
 }
 
 // SighashLegacy returns the message that needs to get signed for the input with the index.
@@ -294,6 +292,7 @@ func (t *Tx) Verify() (bool, error) {
 }
 
 // SignInput signs the input with the index using the private key
+// TODO: make SegWit compatible
 func (t *Tx) SignInput(index int, priv *ecdsa.PrivateKey) (bool, error) {
 	var err error
 	// get the signature hash (the message to sign)
